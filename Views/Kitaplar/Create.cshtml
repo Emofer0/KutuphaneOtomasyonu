@@ -1,0 +1,61 @@
+@model KutuphaneOtomasyonu.Models.Kitaplar
+
+@{
+    ViewData["Title"] = "Create";
+}
+
+<h1>Create</h1>
+
+<h4>Kitaplar</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Create">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <div class="form-group">
+                <label asp-for="Isbn" class="control-label"></label>
+                <input asp-for="Isbn" class="form-control" />
+                <span asp-validation-for="Isbn" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Baslik" class="control-label"></label>
+                <input asp-for="Baslik" class="form-control" />
+                <span asp-validation-for="Baslik" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="YazarId" class="control-label"></label>
+                <select asp-for="YazarId" class ="form-control" asp-items="ViewBag.YazarId"></select>
+            </div>
+            <div class="form-group">
+                <label asp-for="KategoriId" class="control-label"></label>
+                <select asp-for="KategoriId" class ="form-control" asp-items="ViewBag.KategoriId"></select>
+            </div>
+            <div class="form-group">
+                <label asp-for="RafKonumu" class="control-label"></label>
+                <input asp-for="RafKonumu" class="form-control" />
+                <span asp-validation-for="RafKonumu" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="ToplamAdet" class="control-label"></label>
+                <input asp-for="ToplamAdet" class="form-control" />
+                <span asp-validation-for="ToplamAdet" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="MevcutAdet" class="control-label"></label>
+                <input asp-for="MevcutAdet" class="form-control" />
+                <span asp-validation-for="MevcutAdet" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Create" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}
