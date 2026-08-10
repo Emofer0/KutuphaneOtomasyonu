@@ -1,61 +1,62 @@
 @model KutuphaneOtomasyonu.Models.OduncIslemleri
 
 @{
-    ViewData["Title"] = "Create";
+    ViewData["Title"] = "Kitap Ödünç Ver";
 }
 
-<h1>Create</h1>
+<h1>Kitap Ödünç Ver</h1>
 
-<h4>OduncIslemleri</h4>
 <hr />
+
 <div class="row">
-    <div class="col-md-4">
-        <form asp-action="Create">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group">
-                <label asp-for="KitapId" class="control-label"></label>
-                <select asp-for="KitapId" class ="form-control" asp-items="ViewBag.KitapId"></select>
-            </div>
-            <div class="form-group">
-                <label asp-for="UyeId" class="control-label"></label>
-                <select asp-for="UyeId" class ="form-control" asp-items="ViewBag.UyeId"></select>
-            </div>
-            <div class="form-group">
-                <label asp-for="VerilisTarihi" class="control-label"></label>
-                <input asp-for="VerilisTarihi" class="form-control" />
-                <span asp-validation-for="VerilisTarihi" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="SonTeslimTarihi" class="control-label"></label>
-                <input asp-for="SonTeslimTarihi" class="form-control" />
-                <span asp-validation-for="SonTeslimTarihi" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="IadeTarihi" class="control-label"></label>
-                <input asp-for="IadeTarihi" class="form-control" />
-                <span asp-validation-for="IadeTarihi" class="text-danger"></span>
-            </div>
-            <div class="form-group">
-                <label asp-for="CezaTutari" class="control-label"></label>
-                <input asp-for="CezaTutari" class="form-control" />
-                <span asp-validation-for="CezaTutari" class="text-danger"></span>
-            </div>
-            <div class="form-group form-check">
-                <label class="form-check-label">
-                    <input class="form-check-input" asp-for="TeslimEdildiMi" /> @Html.DisplayNameFor(model => model.TeslimEdildiMi)
+    <div class="col-md-6">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly"
+                 class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label asp-for="KitapId" class="form-label">
+                    Kitap
                 </label>
+
+                <select asp-for="KitapId"
+                        class="form-select"
+                        asp-items="ViewBag.KitapId">
+                    <option value="">Kitap seçiniz</option>
+                </select>
+
+                <span asp-validation-for="KitapId"
+                      class="text-danger"></span>
             </div>
-            <div class="form-group">
-                <input type="submit" value="Create" class="btn btn-primary" />
+
+            <div class="mb-3">
+                <label asp-for="UyeId" class="form-label">
+                    Üye
+                </label>
+
+                <select asp-for="UyeId"
+                        class="form-select"
+                        asp-items="ViewBag.UyeId">
+                    <option value="">Üye seçiniz</option>
+                </select>
+
+                <span asp-validation-for="UyeId"
+                      class="text-danger"></span>
             </div>
+
+            <button type="submit" class="btn btn-primary">
+                Ödünç Ver
+            </button>
+
+            <a asp-action="Index" class="btn btn-secondary">
+                Listeye Dön
+            </a>
         </form>
     </div>
 </div>
 
-<div>
-    <a asp-action="Index">Back to List</a>
-</div>
-
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
 }

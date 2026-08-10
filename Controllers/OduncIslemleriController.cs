@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using KutuphaneOtomasyonu.Data;
+using KutuphaneOtomasyonu.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using KutuphaneOtomasyonu.Data;
-using KutuphaneOtomasyonu.Models;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
@@ -19,14 +15,16 @@ namespace KutuphaneOtomasyonu.Controllers
             _context = context;
         }
 
-        // GET: OduncIslemleri
         public async Task<IActionResult> Index()
         {
-            var kutuphaneContext = _context.OduncIslemleris.Include(o => o.Kitap).Include(o => o.Uye);
-            return View(await kutuphaneContext.ToListAsync());
+            var islemler = _context.OduncIslemleris
+                .Include(o => o.Kitap)
+                .Include(o => o.Uye)
+                .OrderByDescending(o => o.VerilisTarihi);
+
+            return View(await islemler.ToListAsync());
         }
 
-        // GET: OduncIslemleri/Details/5
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -34,100 +32,143 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var oduncIslemleri = await _context.OduncIslemleris
+            var islem = await _context.OduncIslemleris
                 .Include(o => o.Kitap)
                 .Include(o => o.Uye)
-                .FirstOrDefaultAsync(m => m.OduncId == id);
-            if (oduncIslemleri == null)
+                .FirstOrDefaultAsync(o => o.OduncId == id);
+
+            if (islem == null)
             {
                 return NotFound();
             }
 
-            return View(oduncIslemleri);
+            return View(islem);
         }
 
-        // GET: OduncIslemleri/Create
         public IActionResult Create()
         {
-            ViewData["KitapId"] = new SelectList(_context.Kitaplars, "KitapId", "KitapId");
-            ViewData["UyeId"] = new SelectList(_context.Uyelers, "UyeId", "UyeId");
+            FormListeleriniHazirla();
             return View();
         }
 
-        // POST: OduncIslemleri/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("OduncId,KitapId,UyeId,VerilisTarihi,SonTeslimTarihi,IadeTarihi,CezaTutari,TeslimEdildiMi")] OduncIslemleri oduncIslemleri)
+        public async Task<IActionResult> Create(int KitapId, int UyeId)
         {
-            if (ModelState.IsValid)
+            var kitap = await _context.Kitaplars
+                .FirstOrDefaultAsync(k => k.KitapId == KitapId);
+
+            var uye = await _context.Uyelers
+                .FirstOrDefaultAsync(u => u.UyeId == UyeId);
+
+            if (kitap == null)
             {
-                _context.Add(oduncIslemleri);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(
+                    "KitapId",
+                    "Geçerli bir kitap seçiniz."
+                );
             }
-            ViewData["KitapId"] = new SelectList(_context.Kitaplars, "KitapId", "KitapId", oduncIslemleri.KitapId);
-            ViewData["UyeId"] = new SelectList(_context.Uyelers, "UyeId", "UyeId", oduncIslemleri.UyeId);
-            return View(oduncIslemleri);
+            else if (kitap.MevcutAdet <= 0)
+            {
+                ModelState.AddModelError(
+                    "KitapId",
+                    "Bu kitabın mevcut stoğu bulunmamaktadır."
+                );
+            }
+
+            if (uye == null)
+            {
+                ModelState.AddModelError(
+                    "UyeId",
+                    "Geçerli bir üye seçiniz."
+                );
+            }
+
+            if (!ModelState.IsValid)
+            {
+                FormListeleriniHazirla(KitapId, UyeId);
+
+                return View(new OduncIslemleri
+                {
+                    KitapId = KitapId,
+                    UyeId = UyeId
+                });
+            }
+
+            var yeniIslem = new OduncIslemleri
+            {
+                KitapId = KitapId,
+                UyeId = UyeId,
+                VerilisTarihi = DateTime.Now,
+                SonTeslimTarihi = DateTime.Now.AddDays(14),
+                IadeTarihi = null,
+                CezaTutari = 0,
+                TeslimEdildiMi = false
+            };
+
+            kitap!.MevcutAdet--;
+
+            _context.OduncIslemleris.Add(yeniIslem);
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Kitap başarıyla ödünç verildi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: OduncIslemleri/Edit/5
-        public async Task<IActionResult> Edit(int? id)
-        {
-            if (id == null)
-            {
-                return NotFound();
-            }
-
-            var oduncIslemleri = await _context.OduncIslemleris.FindAsync(id);
-            if (oduncIslemleri == null)
-            {
-                return NotFound();
-            }
-            ViewData["KitapId"] = new SelectList(_context.Kitaplars, "KitapId", "KitapId", oduncIslemleri.KitapId);
-            ViewData["UyeId"] = new SelectList(_context.Uyelers, "UyeId", "UyeId", oduncIslemleri.UyeId);
-            return View(oduncIslemleri);
-        }
-
-        // POST: OduncIslemleri/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("OduncId,KitapId,UyeId,VerilisTarihi,SonTeslimTarihi,IadeTarihi,CezaTutari,TeslimEdildiMi")] OduncIslemleri oduncIslemleri)
+        public async Task<IActionResult> IadeEt(int id)
         {
-            if (id != oduncIslemleri.OduncId)
+            var islem = await _context.OduncIslemleris
+                .Include(o => o.Kitap)
+                .FirstOrDefaultAsync(o => o.OduncId == id);
+
+            if (islem == null)
             {
                 return NotFound();
             }
 
-            if (ModelState.IsValid)
+            if (islem.TeslimEdildiMi)
             {
-                try
-                {
-                    _context.Update(oduncIslemleri);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!OduncIslemleriExists(oduncIslemleri.OduncId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
+                TempData["HataMesaji"] =
+                    "Bu kitap daha önce iade edilmiş.";
+
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["KitapId"] = new SelectList(_context.Kitaplars, "KitapId", "KitapId", oduncIslemleri.KitapId);
-            ViewData["UyeId"] = new SelectList(_context.Uyelers, "UyeId", "UyeId", oduncIslemleri.UyeId);
-            return View(oduncIslemleri);
+
+            var iadeTarihi = DateTime.Now;
+
+            islem.IadeTarihi = iadeTarihi;
+            islem.TeslimEdildiMi = true;
+
+            if (iadeTarihi.Date > islem.SonTeslimTarihi.Date)
+            {
+                var gecikmeGunSayisi =
+                    (iadeTarihi.Date -
+                     islem.SonTeslimTarihi.Date).Days;
+
+                islem.CezaTutari = gecikmeGunSayisi * 5;
+            }
+            else
+            {
+                islem.CezaTutari = 0;
+            }
+
+            if (islem.Kitap != null)
+            {
+                islem.Kitap.MevcutAdet++;
+            }
+
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Kitap başarıyla iade edildi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: OduncIslemleri/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -135,36 +176,67 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var oduncIslemleri = await _context.OduncIslemleris
+            var islem = await _context.OduncIslemleris
                 .Include(o => o.Kitap)
                 .Include(o => o.Uye)
-                .FirstOrDefaultAsync(m => m.OduncId == id);
-            if (oduncIslemleri == null)
+                .FirstOrDefaultAsync(o => o.OduncId == id);
+
+            if (islem == null)
             {
                 return NotFound();
             }
 
-            return View(oduncIslemleri);
+            return View(islem);
         }
 
-        // POST: OduncIslemleri/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var oduncIslemleri = await _context.OduncIslemleris.FindAsync(id);
-            if (oduncIslemleri != null)
+            var islem = await _context.OduncIslemleris
+                .Include(o => o.Kitap)
+                .FirstOrDefaultAsync(o => o.OduncId == id);
+
+            if (islem == null)
             {
-                _context.OduncIslemleris.Remove(oduncIslemleri);
+                return RedirectToAction(nameof(Index));
             }
 
+            if (!islem.TeslimEdildiMi &&
+                islem.Kitap != null)
+            {
+                islem.Kitap.MevcutAdet++;
+            }
+
+            _context.OduncIslemleris.Remove(islem);
             await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Ödünç işlemi silindi.";
+
             return RedirectToAction(nameof(Index));
         }
 
-        private bool OduncIslemleriExists(int id)
+        private void FormListeleriniHazirla(
+            int? secilenKitapId = null,
+            int? secilenUyeId = null)
         {
-            return _context.OduncIslemleris.Any(e => e.OduncId == id);
+            ViewData["KitapId"] = new SelectList(
+                _context.Kitaplars
+                    .Where(k => k.MevcutAdet > 0)
+                    .OrderBy(k => k.Baslik),
+                "KitapId",
+                "Baslik",
+                secilenKitapId
+            );
+
+            ViewData["UyeId"] = new SelectList(
+                _context.Uyelers
+                    .OrderBy(u => u.AdSoyad),
+                "UyeId",
+                "AdSoyad",
+                secilenUyeId
+            );
         }
     }
 }
