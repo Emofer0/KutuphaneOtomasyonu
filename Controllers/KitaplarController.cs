@@ -1,12 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using KutuphaneOtomasyonu.Data;
+using KutuphaneOtomasyonu.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
-using KutuphaneOtomasyonu.Data;
-using KutuphaneOtomasyonu.Models;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
@@ -19,14 +15,32 @@ namespace KutuphaneOtomasyonu.Controllers
             _context = context;
         }
 
-        // GET: Kitaplar
-        public async Task<IActionResult> Index()
+        // Kitapları listeler ve arama yapar
+        public async Task<IActionResult> Index(string? arama)
         {
-            var kutuphaneContext = _context.Kitaplars.Include(k => k.Kategori).Include(k => k.Yazar);
-            return View(await kutuphaneContext.ToListAsync());
+            var kitaplar = _context.Kitaplars
+                .Include(k => k.Kategori)
+                .Include(k => k.Yazar)
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(arama))
+            {
+                kitaplar = kitaplar.Where(k =>
+                    k.Baslik.Contains(arama) ||
+                    k.Isbn.Contains(arama) ||
+                    (k.RafKonumu != null && k.RafKonumu.Contains(arama)) ||
+                    k.Yazar.AdSoyad.Contains(arama) ||
+                    k.Kategori.Baslik.Contains(arama));
+            }
+
+            ViewBag.Arama = arama;
+
+            return View(await kitaplar
+                .OrderBy(k => k.Baslik)
+                .ToListAsync());
         }
 
-        // GET: Kitaplar/Details/5
+        // Kitap detayları
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -34,45 +48,86 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var kitaplar = await _context.Kitaplars
+            var kitap = await _context.Kitaplars
                 .Include(k => k.Kategori)
                 .Include(k => k.Yazar)
-                .FirstOrDefaultAsync(m => m.KitapId == id);
-            if (kitaplar == null)
+                .FirstOrDefaultAsync(k => k.KitapId == id);
+
+            if (kitap == null)
             {
                 return NotFound();
             }
 
-            return View(kitaplar);
+            return View(kitap);
         }
 
-        // GET: Kitaplar/Create
+        // Kitap ekleme sayfası
         public IActionResult Create()
         {
-            ViewData["KategoriId"] = new SelectList(_context.Kategorilers, "KategoriId", "KategoriId");
-            ViewData["YazarId"] = new SelectList(_context.Yazarlars, "YazarId", "YazarId");
+            ListeleriHazirla();
             return View();
         }
 
-        // POST: Kitaplar/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        // Yeni kitap ekler
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("KitapId,Isbn,Baslik,YazarId,KategoriId,RafKonumu,ToplamAdet,MevcutAdet")] Kitaplar kitaplar)
+        public async Task<IActionResult> Create(
+            [Bind(
+                "KitapId,Isbn,Baslik,YazarId,KategoriId," +
+                "RafKonumu,ToplamAdet,MevcutAdet")]
+            Kitaplar kitap)
         {
+            ModelState.Remove("Yazar");
+            ModelState.Remove("Kategori");
+            ModelState.Remove("OduncIslemleris");
+
+            if (kitap.ToplamAdet < 0)
+            {
+                ModelState.AddModelError(
+                    "ToplamAdet",
+                    "Toplam adet sıfırdan küçük olamaz.");
+            }
+
+            if (kitap.MevcutAdet < 0)
+            {
+                ModelState.AddModelError(
+                    "MevcutAdet",
+                    "Mevcut adet sıfırdan küçük olamaz.");
+            }
+
+            if (kitap.MevcutAdet > kitap.ToplamAdet)
+            {
+                ModelState.AddModelError(
+                    "MevcutAdet",
+                    "Mevcut adet toplam adetten fazla olamaz.");
+            }
+
+            var isbnKullaniliyor = await _context.Kitaplars
+                .AnyAsync(k => k.Isbn == kitap.Isbn);
+
+            if (isbnKullaniliyor)
+            {
+                ModelState.AddModelError(
+                    "Isbn",
+                    "Bu ISBN numarasıyla kayıtlı bir kitap bulunuyor.");
+            }
+
             if (ModelState.IsValid)
             {
-                _context.Add(kitaplar);
+                _context.Kitaplars.Add(kitap);
                 await _context.SaveChangesAsync();
+
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["KategoriId"] = new SelectList(_context.Kategorilers, "KategoriId", "KategoriId", kitaplar.KategoriId);
-            ViewData["YazarId"] = new SelectList(_context.Yazarlars, "YazarId", "YazarId", kitaplar.YazarId);
-            return View(kitaplar);
+
+            ListeleriHazirla(
+                kitap.KategoriId,
+                kitap.YazarId);
+
+            return View(kitap);
         }
 
-        // GET: Kitaplar/Edit/5
+        // Kitap düzenleme sayfası
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -80,54 +135,100 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var kitaplar = await _context.Kitaplars.FindAsync(id);
-            if (kitaplar == null)
+            var kitap = await _context.Kitaplars.FindAsync(id);
+
+            if (kitap == null)
             {
                 return NotFound();
             }
-            ViewData["KategoriId"] = new SelectList(_context.Kategorilers, "KategoriId", "KategoriId", kitaplar.KategoriId);
-            ViewData["YazarId"] = new SelectList(_context.Yazarlars, "YazarId", "YazarId", kitaplar.YazarId);
-            return View(kitaplar);
+
+            ListeleriHazirla(
+                kitap.KategoriId,
+                kitap.YazarId);
+
+            return View(kitap);
         }
 
-        // POST: Kitaplar/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        // Kitabı günceller
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("KitapId,Isbn,Baslik,YazarId,KategoriId,RafKonumu,ToplamAdet,MevcutAdet")] Kitaplar kitaplar)
+        public async Task<IActionResult> Edit(
+            int id,
+            [Bind(
+                "KitapId,Isbn,Baslik,YazarId,KategoriId," +
+                "RafKonumu,ToplamAdet,MevcutAdet")]
+            Kitaplar kitap)
         {
-            if (id != kitaplar.KitapId)
+            if (id != kitap.KitapId)
             {
                 return NotFound();
+            }
+
+            ModelState.Remove("Yazar");
+            ModelState.Remove("Kategori");
+            ModelState.Remove("OduncIslemleris");
+
+            if (kitap.ToplamAdet < 0)
+            {
+                ModelState.AddModelError(
+                    "ToplamAdet",
+                    "Toplam adet sıfırdan küçük olamaz.");
+            }
+
+            if (kitap.MevcutAdet < 0)
+            {
+                ModelState.AddModelError(
+                    "MevcutAdet",
+                    "Mevcut adet sıfırdan küçük olamaz.");
+            }
+
+            if (kitap.MevcutAdet > kitap.ToplamAdet)
+            {
+                ModelState.AddModelError(
+                    "MevcutAdet",
+                    "Mevcut adet toplam adetten fazla olamaz.");
+            }
+
+            var isbnKullaniliyor = await _context.Kitaplars
+                .AnyAsync(k =>
+                    k.Isbn == kitap.Isbn &&
+                    k.KitapId != kitap.KitapId);
+
+            if (isbnKullaniliyor)
+            {
+                ModelState.AddModelError(
+                    "Isbn",
+                    "Bu ISBN numarası başka bir kitapta kullanılıyor.");
             }
 
             if (ModelState.IsValid)
             {
                 try
                 {
-                    _context.Update(kitaplar);
+                    _context.Kitaplars.Update(kitap);
                     await _context.SaveChangesAsync();
                 }
                 catch (DbUpdateConcurrencyException)
                 {
-                    if (!KitaplarExists(kitaplar.KitapId))
+                    if (!KitapExists(kitap.KitapId))
                     {
                         return NotFound();
                     }
-                    else
-                    {
-                        throw;
-                    }
+
+                    throw;
                 }
+
                 return RedirectToAction(nameof(Index));
             }
-            ViewData["KategoriId"] = new SelectList(_context.Kategorilers, "KategoriId", "KategoriId", kitaplar.KategoriId);
-            ViewData["YazarId"] = new SelectList(_context.Yazarlars, "YazarId", "YazarId", kitaplar.YazarId);
-            return View(kitaplar);
+
+            ListeleriHazirla(
+                kitap.KategoriId,
+                kitap.YazarId);
+
+            return View(kitap);
         }
 
-        // GET: Kitaplar/Delete/5
+        // Kitap silme onay sayfası
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -135,36 +236,71 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var kitaplar = await _context.Kitaplars
+            var kitap = await _context.Kitaplars
                 .Include(k => k.Kategori)
                 .Include(k => k.Yazar)
-                .FirstOrDefaultAsync(m => m.KitapId == id);
-            if (kitaplar == null)
+                .FirstOrDefaultAsync(k => k.KitapId == id);
+
+            if (kitap == null)
             {
                 return NotFound();
             }
 
-            return View(kitaplar);
+            return View(kitap);
         }
 
-        // POST: Kitaplar/Delete/5
+        // Kitabı siler
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var kitaplar = await _context.Kitaplars.FindAsync(id);
-            if (kitaplar != null)
+            var kitap = await _context.Kitaplars
+                .Include(k => k.OduncIslemleris)
+                .FirstOrDefaultAsync(k => k.KitapId == id);
+
+            if (kitap == null)
             {
-                _context.Kitaplars.Remove(kitaplar);
+                return RedirectToAction(nameof(Index));
             }
 
+            if (kitap.OduncIslemleris.Any())
+            {
+                TempData["HataMesaji"] =
+                    "Ödünç işlem geçmişi bulunan kitap silinemez.";
+
+                return RedirectToAction(nameof(Index));
+            }
+
+            _context.Kitaplars.Remove(kitap);
             await _context.SaveChangesAsync();
+
             return RedirectToAction(nameof(Index));
         }
 
-        private bool KitaplarExists(int id)
+        // Kategori ve yazar listelerini hazırlar
+        private void ListeleriHazirla(
+            int? kategoriId = null,
+            int? yazarId = null)
         {
-            return _context.Kitaplars.Any(e => e.KitapId == id);
+            ViewData["KategoriId"] = new SelectList(
+                _context.Kategorilers
+                    .OrderBy(k => k.Baslik),
+                "KategoriId",
+                "Baslik",
+                kategoriId);
+
+            ViewData["YazarId"] = new SelectList(
+                _context.Yazarlars
+                    .OrderBy(y => y.AdSoyad),
+                "YazarId",
+                "AdSoyad",
+                yazarId);
+        }
+
+        private bool KitapExists(int id)
+        {
+            return _context.Kitaplars
+                .Any(k => k.KitapId == id);
         }
     }
 }
