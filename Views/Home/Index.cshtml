@@ -1,8 +1,142 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@model IEnumerable<KutuphaneOtomasyonu.Models.OduncIslemleri>
+
+@{
+    ViewData["Title"] = "Ana Sayfa";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="text-center mb-5">
+    <h1 class="display-5">Kütüphane Otomasyonu</h1>
+    <p class="text-muted">
+        Kütüphane işlemlerini yönetim panelinden takip edebilirsiniz.
+    </p>
+</div>
+
+<div class="row g-4 mb-5">
+    <div class="col-md-3">
+        <div class="card text-bg-primary shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title">Toplam Kitap</h5>
+                <h2>@ViewBag.ToplamKitap</h2>
+            </div>
+
+            <div class="card-footer">
+                <a asp-controller="Kitaplar"
+                   asp-action="Index"
+                   class="text-white text-decoration-none">
+                    Kitapları Görüntüle
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-bg-success shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title">Toplam Üye</h5>
+                <h2>@ViewBag.ToplamUye</h2>
+            </div>
+
+            <div class="card-footer">
+                <a asp-controller="Uyeler"
+                   asp-action="Index"
+                   class="text-white text-decoration-none">
+                    Üyeleri Görüntüle
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-bg-warning shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title">Ödünçte</h5>
+                <h2>@ViewBag.OdunctekiKitap</h2>
+            </div>
+
+            <div class="card-footer">
+                <a asp-controller="OduncIslemleri"
+                   asp-action="Index"
+                   class="text-dark text-decoration-none">
+                    İşlemleri Görüntüle
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card text-bg-danger shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title">Geciken</h5>
+                <h2>@ViewBag.GecikenKitap</h2>
+            </div>
+
+            <div class="card-footer">
+                <a asp-controller="OduncIslemleri"
+                   asp-action="Index"
+                   class="text-white text-decoration-none">
+                    Gecikenleri Görüntüle
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Son Ödünç İşlemleri</h2>
+
+    <a asp-controller="OduncIslemleri"
+       asp-action="Create"
+       class="btn btn-primary">
+        Yeni Ödünç İşlemi
+    </a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped table-bordered align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Kitap</th>
+                <th>Üye</th>
+                <th>Veriliş Tarihi</th>
+                <th>Son Teslim Tarihi</th>
+                <th>Durum</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.Kitap?.Baslik</td>
+                    <td>@item.Uye?.AdSoyad</td>
+                    <td>
+                        @item.VerilisTarihi.ToString("dd.MM.yyyy")
+                    </td>
+                    <td>
+                        @item.SonTeslimTarihi.ToString("dd.MM.yyyy")
+                    </td>
+                    <td>
+                        @if (item.TeslimEdildiMi)
+                        {
+                            <span class="badge bg-success">
+                                İade Edildi
+                            </span>
+                        }
+                        else if (item.SonTeslimTarihi < DateTime.Now)
+                        {
+                            <span class="badge bg-danger">
+                                Gecikti
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-warning text-dark">
+                                Ödünçte
+                            </span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
 </div>

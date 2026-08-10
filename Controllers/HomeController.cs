@@ -1,14 +1,42 @@
 using System.Diagnostics;
-using Microsoft.AspNetCore.Mvc;
+using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace KutuphaneOtomasyonu.Controllers;
 
 public class HomeController : Controller
 {
-    public IActionResult Index()
+    private readonly KutuphaneContext _context;
+
+    public HomeController(KutuphaneContext context)
     {
-        return View();
+        _context = context;
+    }
+
+    public async Task<IActionResult> Index()
+    {
+        ViewBag.ToplamKitap = await _context.Kitaplars.CountAsync();
+
+        ViewBag.ToplamUye = await _context.Uyelers.CountAsync();
+
+        ViewBag.OdunctekiKitap = await _context.OduncIslemleris
+            .CountAsync(o => !o.TeslimEdildiMi);
+
+        ViewBag.GecikenKitap = await _context.OduncIslemleris
+            .CountAsync(o =>
+                !o.TeslimEdildiMi &&
+                o.SonTeslimTarihi < DateTime.Now);
+
+        var sonIslemler = await _context.OduncIslemleris
+            .Include(o => o.Kitap)
+            .Include(o => o.Uye)
+            .OrderByDescending(o => o.VerilisTarihi)
+            .Take(5)
+            .ToListAsync();
+
+        return View(sonIslemler);
     }
 
     public IActionResult Privacy()
@@ -16,9 +44,16 @@ public class HomeController : Controller
         return View();
     }
 
-    [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+    [ResponseCache(
+        Duration = 0,
+        Location = ResponseCacheLocation.None,
+        NoStore = true)]
     public IActionResult Error()
     {
-        return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        return View(new ErrorViewModel
+        {
+            RequestId = Activity.Current?.Id ??
+                        HttpContext.TraceIdentifier
+        });
     }
 }
