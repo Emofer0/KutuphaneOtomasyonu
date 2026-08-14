@@ -14,6 +14,7 @@ namespace KutuphaneOtomasyonu.Controllers
             _context = context;
         }
 
+        // Yazarları listeler ve arama yapar
         public async Task<IActionResult> Index(string? arama)
         {
             var yazarlar = _context.Yazarlars.AsQueryable();
@@ -31,6 +32,7 @@ namespace KutuphaneOtomasyonu.Controllers
                 .ToListAsync());
         }
 
+        // Yazar detayını ve yazara ait kitapları gösterir
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -40,6 +42,7 @@ namespace KutuphaneOtomasyonu.Controllers
 
             var yazar = await _context.Yazarlars
                 .Include(y => y.Kitaplars)
+                .ThenInclude(kitap => kitap.Kategori)
                 .FirstOrDefaultAsync(y => y.YazarId == id);
 
             if (yazar == null)
@@ -50,11 +53,13 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(yazar);
         }
 
+        // Yazar ekleme sayfası
         public IActionResult Create()
         {
             return View();
         }
 
+        // Yeni yazar ekler
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
@@ -72,20 +77,21 @@ namespace KutuphaneOtomasyonu.Controllers
                     "Bu isimde bir yazar zaten kayıtlı.");
             }
 
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
-                _context.Yazarlars.Add(yazar);
-                await _context.SaveChangesAsync();
-
-                TempData["BasariliMesaj"] =
-                    "Yazar başarıyla eklendi.";
-
-                return RedirectToAction(nameof(Index));
+                return View(yazar);
             }
 
-            return View(yazar);
+            _context.Yazarlars.Add(yazar);
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Yazar başarıyla eklendi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
+        // Yazar düzenleme sayfası
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -103,6 +109,7 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(yazar);
         }
 
+        // Yazarı günceller
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(
@@ -133,8 +140,20 @@ namespace KutuphaneOtomasyonu.Controllers
                 return View(yazar);
             }
 
-            _context.Yazarlars.Update(yazar);
-            await _context.SaveChangesAsync();
+            try
+            {
+                _context.Yazarlars.Update(yazar);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!YazarExists(yazar.YazarId))
+                {
+                    return NotFound();
+                }
+
+                throw;
+            }
 
             TempData["BasariliMesaj"] =
                 "Yazar bilgileri güncellendi.";
@@ -142,6 +161,7 @@ namespace KutuphaneOtomasyonu.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        // Yazar silme onay sayfası
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -161,6 +181,7 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(yazar);
         }
 
+        // Yazarı siler
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
@@ -189,6 +210,12 @@ namespace KutuphaneOtomasyonu.Controllers
                 "Yazar başarıyla silindi.";
 
             return RedirectToAction(nameof(Index));
+        }
+
+        private bool YazarExists(int id)
+        {
+            return _context.Yazarlars
+                .Any(y => y.YazarId == id);
         }
     }
 }
