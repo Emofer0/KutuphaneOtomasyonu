@@ -1,54 +1,50 @@
 @model KutuphaneOtomasyonu.Models.Uyeler
 
 @{
-    ViewData["Title"] = "Details";
+    ViewData["Title"] = "Üye Detayı";
 }
 
-<h1>Details</h1>
+<h1>Üye Detayı</h1>
 
-<div>
-    <h4>Uyeler</h4>
-    <hr />
-    <dl class="row">
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.AdSoyad)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.AdSoyad)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Eposta)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Eposta)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Telefon)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Telefon)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.KayitTarihi)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.KayitTarihi)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Sifre)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Sifre)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Rol)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Rol)
-        </dd>
-    </dl>
+<div class="card mt-4">
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-sm-3">Ad Soyad</dt>
+            <dd class="col-sm-9">@Model.AdSoyad</dd>
+
+            <dt class="col-sm-3">E-posta</dt>
+            <dd class="col-sm-9">@Model.Eposta</dd>
+
+            <dt class="col-sm-3">Telefon</dt>
+            <dd class="col-sm-9">
+                @(string.IsNullOrWhiteSpace(Model.Telefon)
+                    ? "-"
+                    : Model.Telefon)
+            </dd>
+
+            <dt class="col-sm-3">Kayıt Tarihi</dt>
+            <dd class="col-sm-9">
+                @Model.KayitTarihi.ToString("dd.MM.yyyy HH:mm")
+            </dd>
+
+            <dt class="col-sm-3">Rol</dt>
+            <dd class="col-sm-9">
+                <span class="badge bg-secondary">
+                    @Model.Rol
+                </span>
+            </dd>
+        </dl>
+    </div>
 </div>
-<div>
-    <a asp-action="Edit" asp-route-id="@Model?.UyeId">Edit</a> |
-    <a asp-action="Index">Back to List</a>
+
+<div class="mt-3">
+    <a asp-action="Edit"
+       asp-route-id="@Model.UyeId"
+       class="btn btn-warning">
+        Düzenle
+    </a>
+
+    <a asp-action="Index" class="btn btn-secondary">
+        Listeye Dön
+    </a>
 </div>

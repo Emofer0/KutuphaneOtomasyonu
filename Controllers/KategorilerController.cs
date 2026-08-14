@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
@@ -19,13 +14,25 @@ namespace KutuphaneOtomasyonu.Controllers
             _context = context;
         }
 
-        // GET: Kategoriler
-        public async Task<IActionResult> Index()
+        // Kategorileri listeler ve arama yapar
+        public async Task<IActionResult> Index(string? arama)
         {
-            return View(await _context.Kategorilers.ToListAsync());
+            var kategoriler = _context.Kategorilers.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(arama))
+            {
+                kategoriler = kategoriler.Where(k =>
+                    k.Baslik.Contains(arama));
+            }
+
+            ViewBag.Arama = arama;
+
+            return View(await kategoriler
+                .OrderBy(k => k.Baslik)
+                .ToListAsync());
         }
 
-        // GET: Kategoriler/Details/5
+        // Kategori detayını ve kategoriye ait kitapları gösterir
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -33,39 +40,58 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var kategoriler = await _context.Kategorilers
-                .FirstOrDefaultAsync(m => m.KategoriId == id);
-            if (kategoriler == null)
+            var kategori = await _context.Kategorilers
+                .Include(k => k.Kitaplars)
+                .ThenInclude(kitap => kitap.Yazar)
+                .FirstOrDefaultAsync(k => k.KategoriId == id);
+
+            if (kategori == null)
             {
                 return NotFound();
             }
 
-            return View(kategoriler);
+            return View(kategori);
         }
 
-        // GET: Kategoriler/Create
+        // Kategori ekleme sayfası
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Kategoriler/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        // Yeni kategori ekler
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("KategoriId,Baslik")] Kategoriler kategoriler)
+        public async Task<IActionResult> Create(
+            [Bind("Baslik")] Kategoriler kategori)
         {
-            if (ModelState.IsValid)
+            ModelState.Remove("Kitaplars");
+
+            var kategoriVar = await _context.Kategorilers
+                .AnyAsync(k => k.Baslik == kategori.Baslik);
+
+            if (kategoriVar)
             {
-                _context.Add(kategoriler);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(
+                    "Baslik",
+                    "Bu isimde bir kategori zaten kayıtlı.");
             }
-            return View(kategoriler);
+
+            if (!ModelState.IsValid)
+            {
+                return View(kategori);
+            }
+
+            _context.Kategorilers.Add(kategori);
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Kategori başarıyla eklendi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: Kategoriler/Edit/5
+        // Kategori düzenleme sayfası
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -73,50 +99,70 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var kategoriler = await _context.Kategorilers.FindAsync(id);
-            if (kategoriler == null)
+            var kategori = await _context.Kategorilers
+                .FindAsync(id);
+
+            if (kategori == null)
             {
                 return NotFound();
             }
-            return View(kategoriler);
+
+            return View(kategori);
         }
 
-        // POST: Kategoriler/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
+        // Kategoriyi günceller
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("KategoriId,Baslik")] Kategoriler kategoriler)
+        public async Task<IActionResult> Edit(
+            int id,
+            [Bind("KategoriId,Baslik")] Kategoriler kategori)
         {
-            if (id != kategoriler.KategoriId)
+            if (id != kategori.KategoriId)
             {
                 return NotFound();
             }
 
-            if (ModelState.IsValid)
+            ModelState.Remove("Kitaplars");
+
+            var kategoriVar = await _context.Kategorilers
+                .AnyAsync(k =>
+                    k.Baslik == kategori.Baslik &&
+                    k.KategoriId != kategori.KategoriId);
+
+            if (kategoriVar)
             {
-                try
-                {
-                    _context.Update(kategoriler);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!KategorilerExists(kategoriler.KategoriId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(
+                    "Baslik",
+                    "Bu isimde başka bir kategori bulunuyor.");
             }
-            return View(kategoriler);
+
+            if (!ModelState.IsValid)
+            {
+                return View(kategori);
+            }
+
+            try
+            {
+                _context.Kategorilers.Update(kategori);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!KategoriExists(kategori.KategoriId))
+                {
+                    return NotFound();
+                }
+
+                throw;
+            }
+
+            TempData["BasariliMesaj"] =
+                "Kategori bilgileri güncellendi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: Kategoriler/Delete/5
+        // Kategori silme onay sayfası
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -124,34 +170,53 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var kategoriler = await _context.Kategorilers
-                .FirstOrDefaultAsync(m => m.KategoriId == id);
-            if (kategoriler == null)
+            var kategori = await _context.Kategorilers
+                .Include(k => k.Kitaplars)
+                .FirstOrDefaultAsync(k => k.KategoriId == id);
+
+            if (kategori == null)
             {
                 return NotFound();
             }
 
-            return View(kategoriler);
+            return View(kategori);
         }
 
-        // POST: Kategoriler/Delete/5
+        // Kategoriyi siler
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var kategoriler = await _context.Kategorilers.FindAsync(id);
-            if (kategoriler != null)
+            var kategori = await _context.Kategorilers
+                .Include(k => k.Kitaplars)
+                .FirstOrDefaultAsync(k => k.KategoriId == id);
+
+            if (kategori == null)
             {
-                _context.Kategorilers.Remove(kategoriler);
+                return RedirectToAction(nameof(Index));
             }
 
+            if (kategori.Kitaplars.Any())
+            {
+                TempData["HataMesaji"] =
+                    "Bu kategoriye bağlı kitaplar olduğu için kategori silinemez.";
+
+                return RedirectToAction(nameof(Index));
+            }
+
+            _context.Kategorilers.Remove(kategori);
             await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Kategori başarıyla silindi.";
+
             return RedirectToAction(nameof(Index));
         }
 
-        private bool KategorilerExists(int id)
+        private bool KategoriExists(int id)
         {
-            return _context.Kategorilers.Any(e => e.KategoriId == id);
+            return _context.Kategorilers
+                .Any(k => k.KategoriId == id);
         }
     }
 }

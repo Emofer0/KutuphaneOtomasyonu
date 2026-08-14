@@ -1,12 +1,7 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Rendering;
-using Microsoft.EntityFrameworkCore;
 using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
@@ -19,13 +14,23 @@ namespace KutuphaneOtomasyonu.Controllers
             _context = context;
         }
 
-        // GET: Yazarlar
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(string? arama)
         {
-            return View(await _context.Yazarlars.ToListAsync());
+            var yazarlar = _context.Yazarlars.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(arama))
+            {
+                yazarlar = yazarlar.Where(y =>
+                    y.AdSoyad.Contains(arama));
+            }
+
+            ViewBag.Arama = arama;
+
+            return View(await yazarlar
+                .OrderBy(y => y.AdSoyad)
+                .ToListAsync());
         }
 
-        // GET: Yazarlar/Details/5
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -33,39 +38,54 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var yazarlar = await _context.Yazarlars
-                .FirstOrDefaultAsync(m => m.YazarId == id);
-            if (yazarlar == null)
+            var yazar = await _context.Yazarlars
+                .Include(y => y.Kitaplars)
+                .FirstOrDefaultAsync(y => y.YazarId == id);
+
+            if (yazar == null)
             {
                 return NotFound();
             }
 
-            return View(yazarlar);
+            return View(yazar);
         }
 
-        // GET: Yazarlar/Create
         public IActionResult Create()
         {
             return View();
         }
 
-        // POST: Yazarlar/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("YazarId,AdSoyad")] Yazarlar yazarlar)
+        public async Task<IActionResult> Create(
+            [Bind("AdSoyad")] Yazarlar yazar)
         {
+            ModelState.Remove("Kitaplars");
+
+            var yazarVar = await _context.Yazarlars
+                .AnyAsync(y => y.AdSoyad == yazar.AdSoyad);
+
+            if (yazarVar)
+            {
+                ModelState.AddModelError(
+                    "AdSoyad",
+                    "Bu isimde bir yazar zaten kayıtlı.");
+            }
+
             if (ModelState.IsValid)
             {
-                _context.Add(yazarlar);
+                _context.Yazarlars.Add(yazar);
                 await _context.SaveChangesAsync();
+
+                TempData["BasariliMesaj"] =
+                    "Yazar başarıyla eklendi.";
+
                 return RedirectToAction(nameof(Index));
             }
-            return View(yazarlar);
+
+            return View(yazar);
         }
 
-        // GET: Yazarlar/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -73,50 +93,55 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var yazarlar = await _context.Yazarlars.FindAsync(id);
-            if (yazarlar == null)
+            var yazar = await _context.Yazarlars.FindAsync(id);
+
+            if (yazar == null)
             {
                 return NotFound();
             }
-            return View(yazarlar);
+
+            return View(yazar);
         }
 
-        // POST: Yazarlar/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("YazarId,AdSoyad")] Yazarlar yazarlar)
+        public async Task<IActionResult> Edit(
+            int id,
+            [Bind("YazarId,AdSoyad")] Yazarlar yazar)
         {
-            if (id != yazarlar.YazarId)
+            if (id != yazar.YazarId)
             {
                 return NotFound();
             }
 
-            if (ModelState.IsValid)
+            ModelState.Remove("Kitaplars");
+
+            var yazarVar = await _context.Yazarlars
+                .AnyAsync(y =>
+                    y.AdSoyad == yazar.AdSoyad &&
+                    y.YazarId != yazar.YazarId);
+
+            if (yazarVar)
             {
-                try
-                {
-                    _context.Update(yazarlar);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!YazarlarExists(yazarlar.YazarId))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(
+                    "AdSoyad",
+                    "Bu isimde başka bir yazar bulunuyor.");
             }
-            return View(yazarlar);
+
+            if (!ModelState.IsValid)
+            {
+                return View(yazar);
+            }
+
+            _context.Yazarlars.Update(yazar);
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Yazar bilgileri güncellendi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
-        // GET: Yazarlar/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -124,34 +149,46 @@ namespace KutuphaneOtomasyonu.Controllers
                 return NotFound();
             }
 
-            var yazarlar = await _context.Yazarlars
-                .FirstOrDefaultAsync(m => m.YazarId == id);
-            if (yazarlar == null)
+            var yazar = await _context.Yazarlars
+                .Include(y => y.Kitaplars)
+                .FirstOrDefaultAsync(y => y.YazarId == id);
+
+            if (yazar == null)
             {
                 return NotFound();
             }
 
-            return View(yazarlar);
+            return View(yazar);
         }
 
-        // POST: Yazarlar/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var yazarlar = await _context.Yazarlars.FindAsync(id);
-            if (yazarlar != null)
+            var yazar = await _context.Yazarlars
+                .Include(y => y.Kitaplars)
+                .FirstOrDefaultAsync(y => y.YazarId == id);
+
+            if (yazar == null)
             {
-                _context.Yazarlars.Remove(yazarlar);
+                return RedirectToAction(nameof(Index));
             }
 
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
-        }
+            if (yazar.Kitaplars.Any())
+            {
+                TempData["HataMesaji"] =
+                    "Bu yazara bağlı kitaplar olduğu için yazar silinemez.";
 
-        private bool YazarlarExists(int id)
-        {
-            return _context.Yazarlars.Any(e => e.YazarId == id);
+                return RedirectToAction(nameof(Index));
+            }
+
+            _context.Yazarlars.Remove(yazar);
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Yazar başarıyla silindi.";
+
+            return RedirectToAction(nameof(Index));
         }
     }
 }

@@ -1,33 +1,43 @@
 @model KutuphaneOtomasyonu.Models.Kategoriler
 
 @{
-    ViewData["Title"] = "Create";
+    ViewData["Title"] = "Yeni Kategori";
 }
 
-<h1>Create</h1>
+<h1>Yeni Kategori Ekle</h1>
 
-<h4>Kategoriler</h4>
 <hr />
+
 <div class="row">
-    <div class="col-md-4">
-        <form asp-action="Create">
-            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
-            <div class="form-group">
-                <label asp-for="Baslik" class="control-label"></label>
+    <div class="col-md-6">
+        <form asp-action="Create" method="post">
+            <div asp-validation-summary="ModelOnly"
+                 class="text-danger mb-3"></div>
+
+            <div class="mb-3">
+                <label asp-for="Baslik" class="form-label">
+                    Kategori Adı
+                </label>
+
                 <input asp-for="Baslik" class="form-control" />
-                <span asp-validation-for="Baslik" class="text-danger"></span>
+
+                <span asp-validation-for="Baslik"
+                      class="text-danger"></span>
             </div>
-            <div class="form-group">
-                <input type="submit" value="Create" class="btn btn-primary" />
-            </div>
+
+            <button type="submit" class="btn btn-primary">
+                Kategori Ekle
+            </button>
+
+            <a asp-action="Index" class="btn btn-secondary">
+                Listeye Dön
+            </a>
         </form>
     </div>
 </div>
 
-<div>
-    <a asp-action="Index">Back to List</a>
-</div>
-
 @section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
 }
