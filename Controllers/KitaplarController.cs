@@ -28,7 +28,8 @@ namespace KutuphaneOtomasyonu.Controllers
                 kitaplar = kitaplar.Where(k =>
                     k.Baslik.Contains(arama) ||
                     k.Isbn.Contains(arama) ||
-                    (k.RafKonumu != null && k.RafKonumu.Contains(arama)) ||
+                    (k.RafKonumu != null &&
+                     k.RafKonumu.Contains(arama)) ||
                     k.Yazar.AdSoyad.Contains(arama) ||
                     k.Kategori.Baslik.Contains(arama));
             }
@@ -40,7 +41,7 @@ namespace KutuphaneOtomasyonu.Controllers
                 .ToListAsync());
         }
 
-        // Kitap detayları
+        // Kitap detayını ve ödünç geçmişini gösterir
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -51,6 +52,8 @@ namespace KutuphaneOtomasyonu.Controllers
             var kitap = await _context.Kitaplars
                 .Include(k => k.Kategori)
                 .Include(k => k.Yazar)
+                .Include(k => k.OduncIslemleris)
+                .ThenInclude(o => o.Uye)
                 .FirstOrDefaultAsync(k => k.KitapId == id);
 
             if (kitap == null)
@@ -81,26 +84,7 @@ namespace KutuphaneOtomasyonu.Controllers
             ModelState.Remove("Kategori");
             ModelState.Remove("OduncIslemleris");
 
-            if (kitap.ToplamAdet < 0)
-            {
-                ModelState.AddModelError(
-                    "ToplamAdet",
-                    "Toplam adet sıfırdan küçük olamaz.");
-            }
-
-            if (kitap.MevcutAdet < 0)
-            {
-                ModelState.AddModelError(
-                    "MevcutAdet",
-                    "Mevcut adet sıfırdan küçük olamaz.");
-            }
-
-            if (kitap.MevcutAdet > kitap.ToplamAdet)
-            {
-                ModelState.AddModelError(
-                    "MevcutAdet",
-                    "Mevcut adet toplam adetten fazla olamaz.");
-            }
+            KitapBilgileriniDogrula(kitap);
 
             var isbnKullaniliyor = await _context.Kitaplars
                 .AnyAsync(k => k.Isbn == kitap.Isbn);
@@ -112,19 +96,42 @@ namespace KutuphaneOtomasyonu.Controllers
                     "Bu ISBN numarasıyla kayıtlı bir kitap bulunuyor.");
             }
 
-            if (ModelState.IsValid)
-            {
-                _context.Kitaplars.Add(kitap);
-                await _context.SaveChangesAsync();
+            var yazarVar = await _context.Yazarlars
+                .AnyAsync(y => y.YazarId == kitap.YazarId);
 
-                return RedirectToAction(nameof(Index));
+            if (!yazarVar)
+            {
+                ModelState.AddModelError(
+                    "YazarId",
+                    "Geçerli bir yazar seçiniz.");
             }
 
-            ListeleriHazirla(
-                kitap.KategoriId,
-                kitap.YazarId);
+            var kategoriVar = await _context.Kategorilers
+                .AnyAsync(k => k.KategoriId == kitap.KategoriId);
 
-            return View(kitap);
+            if (!kategoriVar)
+            {
+                ModelState.AddModelError(
+                    "KategoriId",
+                    "Geçerli bir kategori seçiniz.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                ListeleriHazirla(
+                    kitap.KategoriId,
+                    kitap.YazarId);
+
+                return View(kitap);
+            }
+
+            _context.Kitaplars.Add(kitap);
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Kitap başarıyla eklendi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
         // Kitap düzenleme sayfası
@@ -168,26 +175,7 @@ namespace KutuphaneOtomasyonu.Controllers
             ModelState.Remove("Kategori");
             ModelState.Remove("OduncIslemleris");
 
-            if (kitap.ToplamAdet < 0)
-            {
-                ModelState.AddModelError(
-                    "ToplamAdet",
-                    "Toplam adet sıfırdan küçük olamaz.");
-            }
-
-            if (kitap.MevcutAdet < 0)
-            {
-                ModelState.AddModelError(
-                    "MevcutAdet",
-                    "Mevcut adet sıfırdan küçük olamaz.");
-            }
-
-            if (kitap.MevcutAdet > kitap.ToplamAdet)
-            {
-                ModelState.AddModelError(
-                    "MevcutAdet",
-                    "Mevcut adet toplam adetten fazla olamaz.");
-            }
+            KitapBilgileriniDogrula(kitap);
 
             var isbnKullaniliyor = await _context.Kitaplars
                 .AnyAsync(k =>
@@ -201,31 +189,54 @@ namespace KutuphaneOtomasyonu.Controllers
                     "Bu ISBN numarası başka bir kitapta kullanılıyor.");
             }
 
-            if (ModelState.IsValid)
+            var yazarVar = await _context.Yazarlars
+                .AnyAsync(y => y.YazarId == kitap.YazarId);
+
+            if (!yazarVar)
             {
-                try
-                {
-                    _context.Kitaplars.Update(kitap);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!KitapExists(kitap.KitapId))
-                    {
-                        return NotFound();
-                    }
-
-                    throw;
-                }
-
-                return RedirectToAction(nameof(Index));
+                ModelState.AddModelError(
+                    "YazarId",
+                    "Geçerli bir yazar seçiniz.");
             }
 
-            ListeleriHazirla(
-                kitap.KategoriId,
-                kitap.YazarId);
+            var kategoriVar = await _context.Kategorilers
+                .AnyAsync(k => k.KategoriId == kitap.KategoriId);
 
-            return View(kitap);
+            if (!kategoriVar)
+            {
+                ModelState.AddModelError(
+                    "KategoriId",
+                    "Geçerli bir kategori seçiniz.");
+            }
+
+            if (!ModelState.IsValid)
+            {
+                ListeleriHazirla(
+                    kitap.KategoriId,
+                    kitap.YazarId);
+
+                return View(kitap);
+            }
+
+            try
+            {
+                _context.Kitaplars.Update(kitap);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!KitapExists(kitap.KitapId))
+                {
+                    return NotFound();
+                }
+
+                throw;
+            }
+
+            TempData["BasariliMesaj"] =
+                "Kitap bilgileri güncellendi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
         // Kitap silme onay sayfası
@@ -239,6 +250,7 @@ namespace KutuphaneOtomasyonu.Controllers
             var kitap = await _context.Kitaplars
                 .Include(k => k.Kategori)
                 .Include(k => k.Yazar)
+                .Include(k => k.OduncIslemleris)
                 .FirstOrDefaultAsync(k => k.KitapId == id);
 
             if (kitap == null)
@@ -274,10 +286,38 @@ namespace KutuphaneOtomasyonu.Controllers
             _context.Kitaplars.Remove(kitap);
             await _context.SaveChangesAsync();
 
+            TempData["BasariliMesaj"] =
+                "Kitap başarıyla silindi.";
+
             return RedirectToAction(nameof(Index));
         }
 
-        // Kategori ve yazar listelerini hazırlar
+        // Stok bilgilerini kontrol eder
+        private void KitapBilgileriniDogrula(Kitaplar kitap)
+        {
+            if (kitap.ToplamAdet < 0)
+            {
+                ModelState.AddModelError(
+                    "ToplamAdet",
+                    "Toplam adet sıfırdan küçük olamaz.");
+            }
+
+            if (kitap.MevcutAdet < 0)
+            {
+                ModelState.AddModelError(
+                    "MevcutAdet",
+                    "Mevcut adet sıfırdan küçük olamaz.");
+            }
+
+            if (kitap.MevcutAdet > kitap.ToplamAdet)
+            {
+                ModelState.AddModelError(
+                    "MevcutAdet",
+                    "Mevcut adet toplam adetten fazla olamaz.");
+            }
+        }
+
+        // Kategori ve yazar seçim listelerini hazırlar
         private void ListeleriHazirla(
             int? kategoriId = null,
             int? yazarId = null)
