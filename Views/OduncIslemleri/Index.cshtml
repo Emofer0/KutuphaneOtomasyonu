@@ -26,122 +26,211 @@
     </div>
 }
 
-<div class="table-responsive">
-    <table class="table table-striped table-bordered align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>Kitap</th>
-                <th>Üye</th>
-                <th>Veriliş Tarihi</th>
-                <th>Son Teslim Tarihi</th>
-                <th>İade Tarihi</th>
-                <th>Ceza</th>
-                <th>Durum</th>
-                <th>İşlemler</th>
-            </tr>
-        </thead>
+<div class="row g-3 mb-4">
+    <div class="col-lg-7">
+        <div class="btn-group flex-wrap" role="group">
+            <a asp-action="Index"
+               asp-route-arama="@ViewBag.Arama"
+               class="btn @(string.IsNullOrEmpty(ViewBag.Durum)
+                   ? "btn-dark"
+                   : "btn-outline-dark")">
+                Tümü
+            </a>
 
-        <tbody>
-            @foreach (var item in Model)
-            {
-                var geciktiMi =
-                    !item.TeslimEdildiMi &&
-                    item.SonTeslimTarihi.Date < DateTime.Today;
+            <a asp-action="Index"
+               asp-route-durum="oduncte"
+               asp-route-arama="@ViewBag.Arama"
+               class="btn @(ViewBag.Durum == "oduncte"
+                   ? "btn-warning"
+                   : "btn-outline-warning")">
+                Ödünçte
+            </a>
 
-                var gecikmeGunSayisi = geciktiMi
-                    ? (DateTime.Today -
-                       item.SonTeslimTarihi.Date).Days
-                    : 0;
+            <a asp-action="Index"
+               asp-route-durum="geciken"
+               asp-route-arama="@ViewBag.Arama"
+               class="btn @(ViewBag.Durum == "geciken"
+                   ? "btn-danger"
+                   : "btn-outline-danger")">
+                Geciken
+            </a>
 
-                var guncelCeza = geciktiMi
-                    ? gecikmeGunSayisi * 5
-                    : item.CezaTutari;
+            <a asp-action="Index"
+               asp-route-durum="iade"
+               asp-route-arama="@ViewBag.Arama"
+               class="btn @(ViewBag.Durum == "iade"
+                   ? "btn-success"
+                   : "btn-outline-success")">
+                İade Edilenler
+            </a>
+        </div>
+    </div>
 
-                <tr class="@(geciktiMi ? "table-danger" : "")">
-                    <td>@item.Kitap?.Baslik</td>
-                    <td>@item.Uye?.AdSoyad</td>
+    <div class="col-lg-5">
+        <form asp-action="Index" method="get">
+            <input type="hidden"
+                   name="durum"
+                   value="@ViewBag.Durum" />
 
-                    <td>
-                        @item.VerilisTarihi.ToString("dd.MM.yyyy")
-                    </td>
+            <div class="input-group">
+                <input type="text"
+                       name="arama"
+                       value="@ViewBag.Arama"
+                       class="form-control"
+                       placeholder="Kitap veya üye ara..." />
 
-                    <td>
-                        @item.SonTeslimTarihi.ToString("dd.MM.yyyy")
-                    </td>
+                <button type="submit" class="btn btn-primary">
+                    Ara
+                </button>
 
-                    <td>
-                        @if (item.IadeTarihi.HasValue)
-                        {
-                            @item.IadeTarihi.Value.ToString("dd.MM.yyyy")
-                        }
-                        else
-                        {
-                            <span>-</span>
-                        }
-                    </td>
-
-                    <td>
-                        @guncelCeza.ToString("N2") <span>TL</span>
-
-                        @if (geciktiMi)
-                        {
-                            <div class="small text-danger">
-                                Güncel tahmini ceza
-                            </div>
-                        }
-                    </td>
-
-                    <td>
-                        @if (item.TeslimEdildiMi)
-                        {
-                            <span class="badge bg-success">
-                                İade Edildi
-                            </span>
-                        }
-                        else if (geciktiMi)
-                        {
-                            <span class="badge bg-danger">
-                                @gecikmeGunSayisi gün gecikti
-                            </span>
-                        }
-                        else
-                        {
-                            <span class="badge bg-warning text-dark">
-                                Ödünçte
-                            </span>
-                        }
-                    </td>
-
-                    <td>
-                        @if (!item.TeslimEdildiMi)
-                        {
-                            <form asp-action="IadeEt"
-                                  asp-route-id="@item.OduncId"
-                                  method="post"
-                                  class="d-inline">
-
-                                <button type="submit"
-                                        class="btn btn-success btn-sm"
-                                        onclick="return confirm('Kitap iade edilsin mi?')">
-                                    İade Et
-                                </button>
-                            </form>
-                        }
-
-                        <a asp-action="Details"
-                           asp-route-id="@item.OduncId"
-                           class="btn btn-info btn-sm">
-                            Detay
-                        </a>
-
-                        <a asp-action="Delete"
-                           asp-route-id="@item.OduncId"
-                           class="btn btn-danger btn-sm">
-                            Sil
-                        </a>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+                <a asp-action="Index"
+                   asp-route-durum="@ViewBag.Durum"
+                   class="btn btn-secondary">
+                    Temizle
+                </a>
+            </div>
+        </form>
+    </div>
 </div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        Seçilen kriterlere uygun ödünç işlemi bulunamadı.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Kitap</th>
+                    <th>Üye</th>
+                    <th>Veriliş Tarihi</th>
+                    <th>Son Teslim Tarihi</th>
+                    <th>İade Tarihi</th>
+                    <th>Ceza</th>
+                    <th>Durum</th>
+                    <th>İşlemler</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    var geciktiMi =
+                        !item.TeslimEdildiMi &&
+                        item.SonTeslimTarihi.Date < DateTime.Today;
+
+                    var gecikmeGunSayisi = geciktiMi
+                        ? (DateTime.Today -
+                           item.SonTeslimTarihi.Date).Days
+                        : 0;
+
+                    var guncelCeza = geciktiMi
+                        ? gecikmeGunSayisi * 5
+                        : item.CezaTutari;
+
+                    <tr class="@(geciktiMi ? "table-danger" : "")">
+                        <td>
+                            <a asp-controller="Kitaplar"
+                               asp-action="Details"
+                               asp-route-id="@item.KitapId">
+                                @item.Kitap?.Baslik
+                            </a>
+                        </td>
+
+                        <td>
+                            <a asp-controller="Uyeler"
+                               asp-action="Details"
+                               asp-route-id="@item.UyeId">
+                                @item.Uye?.AdSoyad
+                            </a>
+                        </td>
+
+                        <td>
+                            @item.VerilisTarihi.ToString("dd.MM.yyyy")
+                        </td>
+
+                        <td>
+                            @item.SonTeslimTarihi.ToString("dd.MM.yyyy")
+                        </td>
+
+                        <td>
+                            @if (item.IadeTarihi.HasValue)
+                            {
+                                @item.IadeTarihi.Value.ToString("dd.MM.yyyy")
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </td>
+
+                        <td>
+                            @guncelCeza.ToString("N2") <span>TL</span>
+
+                            @if (geciktiMi)
+                            {
+                                <div class="small text-danger">
+                                    Tahmini ceza
+                                </div>
+                            }
+                        </td>
+
+                        <td>
+                            @if (item.TeslimEdildiMi)
+                            {
+                                <span class="badge bg-success">
+                                    İade Edildi
+                                </span>
+                            }
+                            else if (geciktiMi)
+                            {
+                                <span class="badge bg-danger">
+                                    @gecikmeGunSayisi gün gecikti
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">
+                                    Ödünçte
+                                </span>
+                            }
+                        </td>
+
+                        <td>
+                            @if (!item.TeslimEdildiMi)
+                            {
+                                <form asp-action="IadeEt"
+                                      asp-route-id="@item.OduncId"
+                                      method="post"
+                                      class="d-inline">
+
+                                    <button type="submit"
+                                            class="btn btn-success btn-sm"
+                                            onclick="return confirm('Kitap iade edilsin mi?')">
+                                        İade Et
+                                    </button>
+                                </form>
+                            }
+
+                            <a asp-action="Details"
+                               asp-route-id="@item.OduncId"
+                               class="btn btn-info btn-sm">
+                                Detay
+                            </a>
+
+                            <a asp-action="Delete"
+                               asp-route-id="@item.OduncId"
+                               class="btn btn-danger btn-sm">
+                                Sil
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
