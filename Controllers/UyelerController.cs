@@ -35,7 +35,7 @@ namespace KutuphaneOtomasyonu.Controllers
                 .ToListAsync());
         }
 
-        // Üye detayları
+        // Üye detayını ve ödünç işlemlerini getirir
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -44,6 +44,8 @@ namespace KutuphaneOtomasyonu.Controllers
             }
 
             var uye = await _context.Uyelers
+                .Include(u => u.OduncIslemleris)
+                .ThenInclude(o => o.Kitap)
                 .FirstOrDefaultAsync(u => u.UyeId == id);
 
             if (uye == null)
@@ -80,22 +82,22 @@ namespace KutuphaneOtomasyonu.Controllers
                     "Bu e-posta adresiyle kayıtlı bir üye bulunuyor.");
             }
 
-            if (ModelState.IsValid)
+            if (!ModelState.IsValid)
             {
-                uye.KayitTarihi = DateTime.Now;
-                uye.Sifre = "";
-                uye.Rol = "Uye";
-
-                _context.Uyelers.Add(uye);
-                await _context.SaveChangesAsync();
-
-                TempData["BasariliMesaj"] =
-                    "Üye başarıyla eklendi.";
-
-                return RedirectToAction(nameof(Index));
+                return View(uye);
             }
 
-            return View(uye);
+            uye.KayitTarihi = DateTime.Now;
+            uye.Sifre = "";
+            uye.Rol = "Uye";
+
+            _context.Uyelers.Add(uye);
+            await _context.SaveChangesAsync();
+
+            TempData["BasariliMesaj"] =
+                "Üye başarıyla eklendi.";
+
+            return RedirectToAction(nameof(Index));
         }
 
         // Üye düzenleme sayfası
