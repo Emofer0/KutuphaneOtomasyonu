@@ -1,61 +1,72 @@
 using System.Diagnostics;
 using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
 
-namespace KutuphaneOtomasyonu.Controllers;
-
-[Authorize]
-public class HomeController : Controller
+namespace KutuphaneOtomasyonu.Controllers
 {
-    private readonly KutuphaneContext _context;
-
-    public HomeController(KutuphaneContext context)
+    [Authorize(Roles = "Admin")]
+    public class HomeController : Controller
     {
-        _context = context;
-    }
+        private readonly KutuphaneContext _context;
 
-    public async Task<IActionResult> Index()
-    {
-        ViewBag.ToplamKitap = await _context.Kitaplars.CountAsync();
-
-        ViewBag.ToplamUye = await _context.Uyelers.CountAsync();
-
-        ViewBag.OdunctekiKitap = await _context.OduncIslemleris
-            .CountAsync(o => !o.TeslimEdildiMi);
-
-        ViewBag.GecikenKitap = await _context.OduncIslemleris
-            .CountAsync(o =>
-                !o.TeslimEdildiMi &&
-                o.SonTeslimTarihi < DateTime.Now);
-
-        var sonIslemler = await _context.OduncIslemleris
-            .Include(o => o.Kitap)
-            .Include(o => o.Uye)
-            .OrderByDescending(o => o.VerilisTarihi)
-            .Take(5)
-            .ToListAsync();
-
-        return View(sonIslemler);
-    }
-
-    public IActionResult Privacy()
-    {
-        return View();
-    }
-
-    [ResponseCache(
-        Duration = 0,
-        Location = ResponseCacheLocation.None,
-        NoStore = true)]
-    public IActionResult Error()
-    {
-        return View(new ErrorViewModel
+        public HomeController(KutuphaneContext context)
         {
-            RequestId = Activity.Current?.Id ??
-                        HttpContext.TraceIdentifier
-        });
+            _context = context;
+        }
+
+        public async Task<IActionResult> Index()
+        {
+            ViewBag.ToplamKitap =
+                await _context.Kitaplars.CountAsync();
+
+            ViewBag.ToplamUye =
+                await _context.Uyelers
+                    .CountAsync(u => u.Rol == "Uye");
+
+            ViewBag.OdunctekiKitap =
+                await _context.OduncIslemleris
+                    .CountAsync(o => !o.TeslimEdildiMi);
+
+            ViewBag.GecikenKitap =
+                await _context.OduncIslemleris
+                    .CountAsync(o =>
+                        !o.TeslimEdildiMi &&
+                        o.SonTeslimTarihi.Date <
+                        DateTime.Today);
+
+            var sonIslemler =
+                await _context.OduncIslemleris
+                    .Include(o => o.Kitap)
+                    .Include(o => o.Uye)
+                    .OrderByDescending(o =>
+                        o.VerilisTarihi)
+                    .Take(5)
+                    .ToListAsync();
+
+            return View(sonIslemler);
+        }
+
+        public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        [AllowAnonymous]
+        [ResponseCache(
+            Duration = 0,
+            Location = ResponseCacheLocation.None,
+            NoStore = true)]
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel
+            {
+                RequestId =
+                    Activity.Current?.Id ??
+                    HttpContext.TraceIdentifier
+            });
+        }
     }
 }

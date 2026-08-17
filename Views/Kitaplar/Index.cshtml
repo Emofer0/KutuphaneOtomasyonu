@@ -2,17 +2,39 @@
 
 @{
     ViewData["Title"] = "Kitaplar";
+    var adminMi = User.IsInRole("Admin");
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1>Kitaplar</h1>
 
-    <a asp-action="Create" class="btn btn-primary">
-        Yeni Kitap Ekle
-    </a>
+    @if (adminMi)
+    {
+        <a asp-action="Create"
+           class="btn btn-primary">
+            Yeni Kitap Ekle
+        </a>
+    }
 </div>
 
-<form asp-action="Index" method="get" class="mb-4">
+@if (TempData["BasariliMesaj"] != null)
+{
+    <div class="alert alert-success">
+        @TempData["BasariliMesaj"]
+    </div>
+}
+
+@if (TempData["HataMesaji"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["HataMesaji"]
+    </div>
+}
+
+<form asp-action="Index"
+      method="get"
+      class="mb-4">
+
     <div class="input-group">
         <input type="text"
                name="arama"
@@ -20,11 +42,13 @@
                class="form-control"
                placeholder="Kitap, ISBN, yazar, kategori veya raf ara..." />
 
-        <button type="submit" class="btn btn-primary">
+        <button type="submit"
+                class="btn btn-primary">
             Ara
         </button>
 
-        <a asp-action="Index" class="btn btn-secondary">
+        <a asp-action="Index"
+           class="btn btn-secondary">
             Temizle
         </a>
     </div>
@@ -50,7 +74,11 @@ else
                     <th>Toplam</th>
                     <th>Mevcut</th>
                     <th>Durum</th>
-                    <th>İşlemler</th>
+
+                    @if (adminMi)
+                    {
+                        <th>İşlemler</th>
+                    }
                 </tr>
             </thead>
 
@@ -59,7 +87,15 @@ else
                 {
                     <tr>
                         <td>@item.Isbn</td>
-                        <td>@item.Baslik</td>
+
+                        <td>
+                            <a asp-action="Details"
+                               asp-route-id="@item.KitapId"
+                               class="text-decoration-none">
+                                @item.Baslik
+                            </a>
+                        </td>
+
                         <td>@item.Yazar?.AdSoyad</td>
                         <td>@item.Kategori?.Baslik</td>
                         <td>@item.RafKonumu</td>
@@ -81,25 +117,28 @@ else
                             }
                         </td>
 
-                        <td>
-                            <a asp-action="Edit"
-                               asp-route-id="@item.KitapId"
-                               class="btn btn-warning btn-sm">
-                                Düzenle
-                            </a>
+                        @if (adminMi)
+                        {
+                            <td>
+                                <a asp-action="Edit"
+                                   asp-route-id="@item.KitapId"
+                                   class="btn btn-warning btn-sm">
+                                    Düzenle
+                                </a>
 
-                            <a asp-action="Details"
-                               asp-route-id="@item.KitapId"
-                               class="btn btn-info btn-sm">
-                                Detay
-                            </a>
+                                <a asp-action="Details"
+                                   asp-route-id="@item.KitapId"
+                                   class="btn btn-info btn-sm">
+                                    Detay
+                                </a>
 
-                            <a asp-action="Delete"
-                               asp-route-id="@item.KitapId"
-                               class="btn btn-danger btn-sm">
-                                Sil
-                            </a>
-                        </td>
+                                <a asp-action="Delete"
+                                   asp-route-id="@item.KitapId"
+                                   class="btn btn-danger btn-sm">
+                                    Sil
+                                </a>
+                            </td>
+                        }
                     </tr>
                 }
             </tbody>

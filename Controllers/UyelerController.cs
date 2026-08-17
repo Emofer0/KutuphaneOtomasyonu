@@ -1,8 +1,9 @@
 using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authorization;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
@@ -11,12 +12,17 @@ namespace KutuphaneOtomasyonu.Controllers
     {
         private readonly KutuphaneContext _context;
 
-        public UyelerController(KutuphaneContext context)
+        private readonly IPasswordHasher<Uyeler>
+            _passwordHasher;
+
+        public UyelerController(
+            KutuphaneContext context,
+            IPasswordHasher<Uyeler> passwordHasher)
         {
             _context = context;
+            _passwordHasher = passwordHasher;
         }
 
-        // Üyeleri listeler ve arama yapar
         public async Task<IActionResult> Index(string? arama)
         {
             var uyeler = _context.Uyelers.AsQueryable();
@@ -37,7 +43,6 @@ namespace KutuphaneOtomasyonu.Controllers
                 .ToListAsync());
         }
 
-        // Üye detayını ve ödünç işlemlerini getirir
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -58,21 +63,21 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(uye);
         }
 
-        // Üye ekleme sayfası
         public IActionResult Create()
         {
             return View();
         }
 
-        // Yeni üye ekler
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-            [Bind("AdSoyad,Eposta,Telefon")] Uyeler uye)
+            [Bind("AdSoyad,Eposta,Telefon,Sifre")] Uyeler uye)
         {
-            ModelState.Remove("Sifre");
             ModelState.Remove("Rol");
             ModelState.Remove("OduncIslemleris");
+
+            uye.AdSoyad = uye.AdSoyad?.Trim() ?? "";
+            uye.Eposta = uye.Eposta?.Trim() ?? "";
 
             var epostaKullaniliyor = await _context.Uyelers
                 .AnyAsync(u => u.Eposta == uye.Eposta);
@@ -84,25 +89,42 @@ namespace KutuphaneOtomasyonu.Controllers
                     "Bu e-posta adresiyle kayıtlı bir üye bulunuyor.");
             }
 
+            if (string.IsNullOrWhiteSpace(uye.Sifre))
+            {
+                ModelState.AddModelError(
+                    "Sifre",
+                    "Şifre zorunludur.");
+            }
+            else if (uye.Sifre.Length < 6)
+            {
+                ModelState.AddModelError(
+                    "Sifre",
+                    "Şifre en az 6 karakter olmalıdır.");
+            }
+
             if (!ModelState.IsValid)
             {
                 return View(uye);
             }
 
             uye.KayitTarihi = DateTime.Now;
-            uye.Sifre = "";
             uye.Rol = "Uye";
+
+            var acikSifre = uye.Sifre;
+
+            uye.Sifre = _passwordHasher.HashPassword(
+                uye,
+                acikSifre);
 
             _context.Uyelers.Add(uye);
             await _context.SaveChangesAsync();
 
             TempData["BasariliMesaj"] =
-                "Üye başarıyla eklendi.";
+                "Üye hesabı başarıyla oluşturuldu.";
 
             return RedirectToAction(nameof(Index));
         }
 
-        // Üye düzenleme sayfası
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -120,7 +142,6 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(uye);
         }
 
-        // Üyeyi günceller
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(
@@ -135,6 +156,9 @@ namespace KutuphaneOtomasyonu.Controllers
             ModelState.Remove("Sifre");
             ModelState.Remove("Rol");
             ModelState.Remove("OduncIslemleris");
+
+            form.AdSoyad = form.AdSoyad?.Trim() ?? "";
+            form.Eposta = form.Eposta?.Trim() ?? "";
 
             var epostaKullaniliyor = await _context.Uyelers
                 .AnyAsync(u =>
@@ -173,7 +197,6 @@ namespace KutuphaneOtomasyonu.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Üye silme onay sayfası
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -192,7 +215,6 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(uye);
         }
 
-        // Üyeyi siler
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
@@ -203,6 +225,14 @@ namespace KutuphaneOtomasyonu.Controllers
 
             if (uye == null)
             {
+                return RedirectToAction(nameof(Index));
+            }
+
+            if (uye.Rol == "Admin")
+            {
+                TempData["HataMesaji"] =
+                    "Admin hesabı üye ekranından silinemez.";
+
                 return RedirectToAction(nameof(Index));
             }
 
@@ -221,12 +251,6 @@ namespace KutuphaneOtomasyonu.Controllers
                 "Üye başarıyla silindi.";
 
             return RedirectToAction(nameof(Index));
-        }
-
-        private bool UyeExists(int id)
-        {
-            return _context.Uyelers
-                .Any(u => u.UyeId == id);
         }
     }
 }

@@ -32,9 +32,7 @@ namespace KutuphaneOtomasyonu.Controllers
         {
             if (User.Identity?.IsAuthenticated == true)
             {
-                return RedirectToAction(
-                    "Index",
-                    "Home");
+                return KullaniciAnaSayfasinaYonlendir();
             }
 
             ViewBag.ReturnUrl = returnUrl;
@@ -73,12 +71,14 @@ namespace KutuphaneOtomasyonu.Controllers
                 return View(model);
             }
 
-            var sonuc = _passwordHasher.VerifyHashedPassword(
-                uye,
-                uye.Sifre,
-                model.Sifre);
+            var sifreSonucu =
+                _passwordHasher.VerifyHashedPassword(
+                    uye,
+                    uye.Sifre,
+                    model.Sifre);
 
-            if (sonuc == PasswordVerificationResult.Failed)
+            if (sifreSonucu ==
+                PasswordVerificationResult.Failed)
             {
                 ModelState.AddModelError(
                     "",
@@ -87,7 +87,7 @@ namespace KutuphaneOtomasyonu.Controllers
                 return View(model);
             }
 
-            if (sonuc ==
+            if (sifreSonucu ==
                 PasswordVerificationResult.SuccessRehashNeeded)
             {
                 uye.Sifre = _passwordHasher.HashPassword(
@@ -143,15 +143,24 @@ namespace KutuphaneOtomasyonu.Controllers
                 principal,
                 authenticationProperties);
 
-            if (!string.IsNullOrWhiteSpace(returnUrl) &&
-                Url.IsLocalUrl(returnUrl))
+            // Admin güvenli bir yerel adrese dönebilir
+            if (rol == "Admin")
             {
-                return LocalRedirect(returnUrl);
+                if (!string.IsNullOrWhiteSpace(returnUrl) &&
+                    Url.IsLocalUrl(returnUrl))
+                {
+                    return LocalRedirect(returnUrl);
+                }
+
+                return RedirectToAction(
+                    "Index",
+                    "Home");
             }
 
+            // Üyeler her zaman kitaplar sayfasına gider
             return RedirectToAction(
                 "Index",
-                "Home");
+                "Kitaplar");
         }
 
         // Çıkış işlemi
@@ -172,6 +181,20 @@ namespace KutuphaneOtomasyonu.Controllers
         public IActionResult Yetkisiz()
         {
             return View();
+        }
+
+        private IActionResult KullaniciAnaSayfasinaYonlendir()
+        {
+            if (User.IsInRole("Admin"))
+            {
+                return RedirectToAction(
+                    "Index",
+                    "Home");
+            }
+
+            return RedirectToAction(
+                "Index",
+                "Kitaplar");
         }
     }
 }

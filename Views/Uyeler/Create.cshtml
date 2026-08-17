@@ -4,7 +4,11 @@
     ViewData["Title"] = "Yeni Üye";
 }
 
-<h1>Yeni Üye Ekle</h1>
+<h1>Yeni Üye Hesabı Oluştur</h1>
+
+<p class="text-muted">
+    Üyenin sisteme giriş yapabilmesi için başlangıç şifresi belirleyin.
+</p>
 
 <hr />
 
@@ -12,50 +16,84 @@
     <div class="col-md-6">
         <form asp-action="Create" method="post">
             <div asp-validation-summary="ModelOnly"
-                 class="text-danger mb-3"></div>
+                 class="alert alert-danger"></div>
 
             <div class="mb-3">
-                <label asp-for="AdSoyad" class="form-label">
+                <label asp-for="AdSoyad"
+                       class="form-label">
                     Ad Soyad
                 </label>
 
-                <input asp-for="AdSoyad" class="form-control" />
+                <input asp-for="AdSoyad"
+                       class="form-control"
+                       autocomplete="name" />
 
                 <span asp-validation-for="AdSoyad"
                       class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label asp-for="Eposta" class="form-label">
+                <label asp-for="Eposta"
+                       class="form-label">
                     E-posta
                 </label>
 
                 <input asp-for="Eposta"
                        type="email"
-                       class="form-control" />
+                       class="form-control"
+                       autocomplete="email" />
 
                 <span asp-validation-for="Eposta"
                       class="text-danger"></span>
             </div>
 
             <div class="mb-3">
-                <label asp-for="Telefon" class="form-label">
+                <label asp-for="Telefon"
+                       class="form-label">
                     Telefon
                 </label>
 
                 <input asp-for="Telefon"
                        type="tel"
-                       class="form-control" />
+                       class="form-control"
+                       autocomplete="tel" />
 
                 <span asp-validation-for="Telefon"
                       class="text-danger"></span>
             </div>
 
-            <button type="submit" class="btn btn-primary">
-                Üye Ekle
+            <div class="mb-3">
+                <label asp-for="Sifre"
+                       class="form-label">
+                    Başlangıç Şifresi
+                </label>
+
+                <input asp-for="Sifre"
+                       type="password"
+                       class="form-control"
+                       minlength="6"
+                       autocomplete="new-password" />
+
+                <span asp-validation-for="Sifre"
+                      class="text-danger"></span>
+
+                <div class="form-text">
+                    Şifre en az 6 karakter olmalıdır.
+                </div>
+            </div>
+
+            <div class="alert alert-info">
+                Yeni hesap otomatik olarak
+                <strong>Üye</strong> rolüyle oluşturulur.
+            </div>
+
+            <button type="submit"
+                    class="btn btn-primary">
+                Üye Hesabı Oluştur
             </button>
 
-            <a asp-action="Index" class="btn btn-secondary">
+            <a asp-action="Index"
+               class="btn btn-secondary">
                 Listeye Dön
             </a>
         </form>
@@ -64,6 +102,7 @@
 
 @section Scripts {
     @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+        await Html.RenderPartialAsync(
+            "_ValidationScriptsPartial");
     }
 }
