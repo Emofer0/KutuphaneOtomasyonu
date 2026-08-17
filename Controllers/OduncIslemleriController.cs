@@ -3,9 +3,11 @@ using KutuphaneOtomasyonu.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
+    [Authorize(Roles = "Admin")]
     public class OduncIslemleriController : Controller
     {
         private readonly KutuphaneContext _context;

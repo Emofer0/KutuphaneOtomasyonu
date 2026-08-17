@@ -2,9 +2,11 @@ using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
+    [Authorize(Roles = "Admin")]
     public class YazarlarController : Controller
     {
         private readonly KutuphaneContext _context;

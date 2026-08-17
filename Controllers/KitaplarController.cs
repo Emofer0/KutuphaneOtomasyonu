@@ -1,11 +1,13 @@
 using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace KutuphaneOtomasyonu.Controllers
 {
+    [Authorize(Roles = "Admin,Uye")]
     public class KitaplarController : Controller
     {
         private readonly KutuphaneContext _context;
@@ -15,7 +17,7 @@ namespace KutuphaneOtomasyonu.Controllers
             _context = context;
         }
 
-        // Kitapları listeler ve arama yapar
+        // Admin ve üyeler kitapları görüntüleyebilir
         public async Task<IActionResult> Index(string? arama)
         {
             var kitaplar = _context.Kitaplars
@@ -41,7 +43,7 @@ namespace KutuphaneOtomasyonu.Controllers
                 .ToListAsync());
         }
 
-        // Kitap detayını ve ödünç geçmişini gösterir
+        // Admin ve üyeler kitap detayını görüntüleyebilir
         public async Task<IActionResult> Details(int? id)
         {
             if (id == null)
@@ -64,15 +66,16 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(kitap);
         }
 
-        // Kitap ekleme sayfası
+        // Yalnızca admin kitap ekleyebilir
+        [Authorize(Roles = "Admin")]
         public IActionResult Create()
         {
             ListeleriHazirla();
             return View();
         }
 
-        // Yeni kitap ekler
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
             [Bind(
@@ -97,7 +100,8 @@ namespace KutuphaneOtomasyonu.Controllers
             }
 
             var yazarVar = await _context.Yazarlars
-                .AnyAsync(y => y.YazarId == kitap.YazarId);
+                .AnyAsync(y =>
+                    y.YazarId == kitap.YazarId);
 
             if (!yazarVar)
             {
@@ -107,7 +111,8 @@ namespace KutuphaneOtomasyonu.Controllers
             }
 
             var kategoriVar = await _context.Kategorilers
-                .AnyAsync(k => k.KategoriId == kitap.KategoriId);
+                .AnyAsync(k =>
+                    k.KategoriId == kitap.KategoriId);
 
             if (!kategoriVar)
             {
@@ -134,7 +139,8 @@ namespace KutuphaneOtomasyonu.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Kitap düzenleme sayfası
+        // Yalnızca admin kitap düzenleyebilir
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Edit(int? id)
         {
             if (id == null)
@@ -156,8 +162,8 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(kitap);
         }
 
-        // Kitabı günceller
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Edit(
             int id,
@@ -190,7 +196,8 @@ namespace KutuphaneOtomasyonu.Controllers
             }
 
             var yazarVar = await _context.Yazarlars
-                .AnyAsync(y => y.YazarId == kitap.YazarId);
+                .AnyAsync(y =>
+                    y.YazarId == kitap.YazarId);
 
             if (!yazarVar)
             {
@@ -200,7 +207,8 @@ namespace KutuphaneOtomasyonu.Controllers
             }
 
             var kategoriVar = await _context.Kategorilers
-                .AnyAsync(k => k.KategoriId == kitap.KategoriId);
+                .AnyAsync(k =>
+                    k.KategoriId == kitap.KategoriId);
 
             if (!kategoriVar)
             {
@@ -239,7 +247,8 @@ namespace KutuphaneOtomasyonu.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Kitap silme onay sayfası
+        // Yalnızca admin kitap silebilir
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int? id)
         {
             if (id == null)
@@ -251,7 +260,8 @@ namespace KutuphaneOtomasyonu.Controllers
                 .Include(k => k.Kategori)
                 .Include(k => k.Yazar)
                 .Include(k => k.OduncIslemleris)
-                .FirstOrDefaultAsync(k => k.KitapId == id);
+                .FirstOrDefaultAsync(k =>
+                    k.KitapId == id);
 
             if (kitap == null)
             {
@@ -261,14 +271,15 @@ namespace KutuphaneOtomasyonu.Controllers
             return View(kitap);
         }
 
-        // Kitabı siler
         [HttpPost, ActionName("Delete")]
+        [Authorize(Roles = "Admin")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var kitap = await _context.Kitaplars
                 .Include(k => k.OduncIslemleris)
-                .FirstOrDefaultAsync(k => k.KitapId == id);
+                .FirstOrDefaultAsync(k =>
+                    k.KitapId == id);
 
             if (kitap == null)
             {
@@ -292,8 +303,8 @@ namespace KutuphaneOtomasyonu.Controllers
             return RedirectToAction(nameof(Index));
         }
 
-        // Stok bilgilerini kontrol eder
-        private void KitapBilgileriniDogrula(Kitaplar kitap)
+        private void KitapBilgileriniDogrula(
+            Kitaplar kitap)
         {
             if (kitap.ToplamAdet < 0)
             {
@@ -317,7 +328,6 @@ namespace KutuphaneOtomasyonu.Controllers
             }
         }
 
-        // Kategori ve yazar seçim listelerini hazırlar
         private void ListeleriHazirla(
             int? kategoriId = null,
             int? yazarId = null)
