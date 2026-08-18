@@ -2,16 +2,48 @@
     ViewData["Title"] = "Yetkisiz Erişim";
 }
 
-<div class="text-center mt-5">
-    <h1 class="display-4 text-danger">Yetkisiz Erişim</h1>
+<div class="row justify-content-center py-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card border-0 text-center shadow-lg">
+            <div class="card-body p-5">
+                <div class="d-inline-flex align-items-center justify-content-center
+                            bg-danger text-white rounded-circle mb-4"
+                     style="width: 76px; height: 76px; font-size: 2rem;">
+                    !
+                </div>
 
-    <p class="lead">
-        Bu sayfayı görüntüleme yetkiniz bulunmamaktadır.
-    </p>
+                <h1>Bu sayfaya erişemezsiniz</h1>
 
-    <a asp-controller="Home"
-       asp-action="Index"
-       class="btn btn-primary">
-        Ana Sayfaya Dön
-    </a>
+                <p class="text-muted fs-5 mt-3">
+                    Hesabınızın bu işlemi gerçekleştirmek için
+                    gerekli yetkisi bulunmuyor.
+                </p>
+
+                <div class="d-flex justify-content-center gap-2 mt-4">
+                    @if (User.IsInRole("Admin"))
+                    {
+                        <a asp-controller="Home"
+                           asp-action="Index"
+                           class="btn btn-primary">
+                            Yönetim Paneline Dön
+                        </a>
+                    }
+                    else
+                    {
+                        <a asp-controller="Kitaplar"
+                           asp-action="Index"
+                           class="btn btn-primary">
+                            Kitaplara Dön
+                        </a>
+
+                        <a asp-controller="Hesabim"
+                           asp-action="Islemlerim"
+                           class="btn btn-outline-primary">
+                            İşlemlerim
+                        </a>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
 </div>

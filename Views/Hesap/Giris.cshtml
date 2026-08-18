@@ -4,15 +4,72 @@
     ViewData["Title"] = "Giriş Yap";
 }
 
-<div class="row justify-content-center mt-5">
-    <div class="col-md-5 col-lg-4">
-        <div class="card shadow">
-            <div class="card-body p-4">
-                <div class="text-center mb-4">
-                    <h1 class="h3">Kütüphane Otomasyonu</h1>
+<div class="row justify-content-center align-items-stretch g-0 my-4">
+    <div class="col-lg-6 d-none d-lg-block">
+        <div class="h-100 p-5 text-white rounded-start-4"
+             style="background: linear-gradient(145deg, #0b172a, #264c70);">
+
+            <div class="d-flex flex-column justify-content-between h-100">
+                <div>
+                    <div class="d-inline-flex align-items-center justify-content-center
+                                bg-warning text-dark rounded-3 fw-bold mb-4"
+                         style="width: 48px; height: 48px;">
+                        K
+                    </div>
+
+                    <h1 class="text-white display-5">
+                        Kütüphane Otomasyonu
+                    </h1>
+
+                    <p class="text-white-50 fs-5 mt-3">
+                        Kitapları, üyeleri ve ödünç işlemlerini
+                        tek bir yerden yönetin.
+                    </p>
+                </div>
+
+                <div class="mt-5">
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-warning text-dark me-3">
+                            01
+                        </span>
+
+                        <span>Kitap ve stok takibi</span>
+                    </div>
+
+                    <div class="d-flex align-items-center mb-3">
+                        <span class="badge bg-warning text-dark me-3">
+                            02
+                        </span>
+
+                        <span>Ödünç ve iade yönetimi</span>
+                    </div>
+
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-warning text-dark me-3">
+                            03
+                        </span>
+
+                        <span>Gecikme ve ceza hesaplama</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8 col-lg-5">
+        <div class="card h-100 border-0 rounded-0 rounded-end-4 shadow-lg">
+            <div class="card-body p-4 p-md-5 d-flex flex-column justify-content-center">
+                <div class="mb-4">
+                    <span class="text-uppercase text-muted small fw-bold">
+                        Güvenli giriş
+                    </span>
+
+                    <h2 class="mt-2 mb-2">
+                        Hesabınıza giriş yapın
+                    </h2>
 
                     <p class="text-muted">
-                        Hesabınızla giriş yapın
+                        Admin veya üye bilgilerinizle devam edin.
                     </p>
                 </div>
 
@@ -20,18 +77,24 @@
                       asp-route-returnUrl="@ViewBag.ReturnUrl"
                       method="post">
 
-                    <div asp-validation-summary="ModelOnly"
-                         class="alert alert-danger"></div>
+                    @if (!ViewData.ModelState.IsValid)
+                    {
+                        <div asp-validation-summary="ModelOnly"
+                             class="alert alert-danger"></div>
+                    }
 
                     <div class="mb-3">
                         <label asp-for="Eposta"
-                               class="form-label"></label>
+                               class="form-label">
+                            E-posta adresi
+                        </label>
 
                         <input asp-for="Eposta"
                                type="email"
-                               class="form-control"
+                               class="form-control form-control-lg"
                                placeholder="ornek@email.com"
-                               autocomplete="email" />
+                               autocomplete="email"
+                               autofocus />
 
                         <span asp-validation-for="Eposta"
                               class="text-danger"></span>
@@ -39,30 +102,39 @@
 
                     <div class="mb-3">
                         <label asp-for="Sifre"
-                               class="form-label"></label>
+                               class="form-label">
+                            Şifre
+                        </label>
 
                         <input asp-for="Sifre"
-                               class="form-control"
-                               placeholder="Şifreniz"
+                               type="password"
+                               class="form-control form-control-lg"
+                               placeholder="Şifrenizi girin"
                                autocomplete="current-password" />
 
                         <span asp-validation-for="Sifre"
                               class="text-danger"></span>
                     </div>
 
-                    <div class="form-check mb-3">
+                    <div class="form-check mb-4">
                         <input asp-for="BeniHatirla"
                                class="form-check-input" />
 
                         <label asp-for="BeniHatirla"
-                               class="form-check-label"></label>
+                               class="form-check-label">
+                            Beni hatırla
+                        </label>
                     </div>
 
                     <button type="submit"
-                            class="btn btn-primary w-100">
+                            class="btn btn-primary btn-lg w-100">
                         Giriş Yap
                     </button>
                 </form>
+
+                <div class="text-center text-muted small mt-4">
+                    Hesap bilgileriniz güvenli şekilde korunur.
+                </div>
             </div>
         </div>
     </div>
@@ -70,6 +142,7 @@
 
 @section Scripts {
     @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+        await Html.RenderPartialAsync(
+            "_ValidationScriptsPartial");
     }
 }
