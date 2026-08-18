@@ -127,9 +127,13 @@
                             }
                         </ul>
 
-                        <ul class="navbar-nav ms-auto align-items-lg-center">
-                            <li class="nav-item me-lg-3">
-                                <span class="nav-link">
+                        <ul class="navbar-nav ms-auto">
+                            <li class="nav-item dropdown">
+                                <button class="nav-link dropdown-toggle border-0 bg-transparent"
+                                        type="button"
+                                        data-bs-toggle="dropdown"
+                                        aria-expanded="false">
+
                                     Merhaba,
                                     <strong>@User.Identity.Name</strong>
 
@@ -145,20 +149,53 @@
                                             Üye
                                         </span>
                                     }
-                                </span>
-                            </li>
+                                </button>
 
-                            <li class="nav-item">
-                                <form asp-controller="Hesap"
-                                      asp-action="Cikis"
-                                      method="post"
-                                      class="d-inline">
+                                <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                    <li>
+                                        <h6 class="dropdown-header">
+                                            Hesap İşlemleri
+                                        </h6>
+                                    </li>
 
-                                    <button type="submit"
-                                            class="btn btn-outline-danger">
-                                        Çıkış Yap
-                                    </button>
-                                </form>
+                                    @if (User.IsInRole("Admin"))
+                                    {
+                                        <li>
+                                            <a class="dropdown-item"
+                                               asp-controller="Home"
+                                               asp-action="Index">
+                                                Yönetim Paneli
+                                            </a>
+                                        </li>
+                                    }
+
+                                    @if (User.IsInRole("Uye"))
+                                    {
+                                        <li>
+                                            <a class="dropdown-item"
+                                               asp-controller="Hesabim"
+                                               asp-action="SifreDegistir">
+                                                Şifre Değiştir
+                                            </a>
+                                        </li>
+                                    }
+
+                                    <li>
+                                        <hr class="dropdown-divider" />
+                                    </li>
+
+                                    <li>
+                                        <form asp-controller="Hesap"
+                                              asp-action="Cikis"
+                                              method="post">
+
+                                            <button type="submit"
+                                                    class="dropdown-item text-danger fw-bold">
+                                                Çıkış Yap
+                                            </button>
+                                        </form>
+                                    </li>
+                                </ul>
                             </li>
                         </ul>
                     }
