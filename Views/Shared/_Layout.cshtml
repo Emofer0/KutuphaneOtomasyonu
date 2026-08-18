@@ -1,4 +1,4 @@
-﻿<<!DOCTYPE html>
+﻿<!DOCTYPE html>
 
 <html lang="tr">
 <head>
@@ -51,6 +51,7 @@
                         aria-controls="anaMenu"
                         aria-expanded="false"
                         aria-label="Menüyü aç">
+
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
@@ -110,6 +111,17 @@
                                        asp-controller="OduncIslemleri"
                                        asp-action="Index">
                                         Ödünç İşlemleri
+                                    </a>
+                                </li>
+                            }
+
+                            @if (User.IsInRole("Uye"))
+                            {
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                       asp-controller="Hesabim"
+                                       asp-action="Islemlerim">
+                                        İşlemlerim
                                     </a>
                                 </li>
                             }

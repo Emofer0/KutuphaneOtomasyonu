@@ -1,0 +1,141 @@
+@model IEnumerable<KutuphaneOtomasyonu.Models.OduncIslemleri>
+
+@{
+    ViewData["Title"] = "İşlemlerim";
+}
+
+<div class="mb-4">
+    <h1>Ödünç İşlemlerim</h1>
+
+    <p class="text-muted">
+        Ödünç aldığınız kitapları ve iade geçmişinizi görüntüleyebilirsiniz.
+    </p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card text-bg-primary h-100">
+            <div class="card-body">
+                <h5>Toplam İşlem</h5>
+                <h2>@ViewBag.ToplamIslem</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card text-bg-warning h-100">
+            <div class="card-body">
+                <h5>Şu Anda Ödünçte</h5>
+                <h2>@ViewBag.AktifIslem</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card text-bg-danger h-100">
+            <div class="card-body">
+                <h5>Geciken</h5>
+                <h2>@ViewBag.GecikenIslem</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-info">
+        Henüz bir ödünç işleminiz bulunmuyor.
+    </div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Kitap</th>
+                    <th>Yazar</th>
+                    <th>Veriliş Tarihi</th>
+                    <th>Son Teslim Tarihi</th>
+                    <th>İade Tarihi</th>
+                    <th>Ceza</th>
+                    <th>Durum</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    var geciktiMi =
+                        !item.TeslimEdildiMi &&
+                        item.SonTeslimTarihi.Date < DateTime.Today;
+
+                    var gecikmeGunSayisi = geciktiMi
+                        ? (DateTime.Today -
+                           item.SonTeslimTarihi.Date).Days
+                        : 0;
+
+                    var guncelCeza = geciktiMi
+                        ? gecikmeGunSayisi * 5
+                        : item.CezaTutari;
+
+                    <tr class="@(geciktiMi ? "table-danger" : "")">
+                        <td>
+                            <a asp-controller="Kitaplar"
+                               asp-action="Details"
+                               asp-route-id="@item.KitapId">
+                                @item.Kitap?.Baslik
+                            </a>
+                        </td>
+
+                        <td>@item.Kitap?.Yazar?.AdSoyad</td>
+
+                        <td>
+                            @item.VerilisTarihi.ToString("dd.MM.yyyy")
+                        </td>
+
+                        <td>
+                            @item.SonTeslimTarihi.ToString("dd.MM.yyyy")
+                        </td>
+
+                        <td>
+                            @(item.IadeTarihi?.ToString("dd.MM.yyyy") ?? "-")
+                        </td>
+
+                        <td>
+                            @guncelCeza.ToString("N2") TL
+
+                            @if (geciktiMi)
+                            {
+                                <div class="small text-danger">
+                                    Tahmini ceza
+                                </div>
+                            }
+                        </td>
+
+                        <td>
+                            @if (item.TeslimEdildiMi)
+                            {
+                                <span class="badge bg-success">
+                                    İade Edildi
+                                </span>
+                            }
+                            else if (geciktiMi)
+                            {
+                                <span class="badge bg-danger">
+                                    @gecikmeGunSayisi gün gecikti
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-warning text-dark">
+                                    Ödünçte
+                                </span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
