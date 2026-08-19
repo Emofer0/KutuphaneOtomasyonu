@@ -1,5 +1,4 @@
 ﻿<!DOCTYPE html>
-
 <html lang="tr">
 <head>
     <meta charset="utf-8" />
@@ -26,23 +25,22 @@
 <body>
     <header>
         <nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm">
-            <div class="container-fluid">
-                @if (User.IsInRole("Admin"))
-                {
-                    <a class="navbar-brand"
-                       asp-controller="Home"
-                       asp-action="Index">
-                        Kütüphane Otomasyonu
-                    </a>
-                }
-                else
-                {
-                    <a class="navbar-brand"
-                       asp-controller="Kitaplar"
-                       asp-action="Index">
-                        Kütüphane Otomasyonu
-                    </a>
-                }
+            <div class="container-fluid px-4">
+
+                <a class="navbar-brand fw-bold d-flex align-items-center"
+                   asp-controller="Home"
+                   asp-action="Index">
+
+                    <span class="d-inline-flex align-items-center justify-content-center
+                                 text-white rounded me-2"
+                          style="width:42px;
+                                 height:42px;
+                                 background-color:#102a4c;">
+                        K
+                    </span>
+
+                    Kütüphane Otomasyonu
+                </a>
 
                 <button class="navbar-toggler"
                         type="button"
@@ -51,16 +49,16 @@
                         aria-controls="anaMenu"
                         aria-expanded="false"
                         aria-label="Menüyü aç">
-
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
                 <div class="collapse navbar-collapse"
                      id="anaMenu">
 
-                    @if (User.Identity?.IsAuthenticated == true)
-                    {
-                        <ul class="navbar-nav me-auto">
+                    <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
                             @if (User.IsInRole("Admin"))
                             {
                                 <li class="nav-item">
@@ -70,18 +68,15 @@
                                         Ana Sayfa
                                     </a>
                                 </li>
-                            }
 
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   asp-controller="Kitaplar"
-                                   asp-action="Index">
-                                    Kitaplar
-                                </a>
-                            </li>
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                       asp-controller="Kitaplar"
+                                       asp-action="Index">
+                                        Kitaplar
+                                    </a>
+                                </li>
 
-                            @if (User.IsInRole("Admin"))
-                            {
                                 <li class="nav-item">
                                     <a class="nav-link"
                                        asp-controller="Yazarlar"
@@ -113,10 +108,25 @@
                                         Ödünç İşlemleri
                                     </a>
                                 </li>
-                            }
 
-                            @if (User.IsInRole("Uye"))
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                       asp-controller="Rezervasyonlar"
+                                       asp-action="Index">
+                                        Rezervasyonlar
+                                    </a>
+                                </li>
+                            }
+                            else if (User.IsInRole("Uye"))
                             {
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                       asp-controller="Kitaplar"
+                                       asp-action="Index">
+                                        Kitaplar
+                                    </a>
+                                </li>
+
                                 <li class="nav-item">
                                     <a class="nav-link"
                                        asp-controller="Hesabim"
@@ -124,34 +134,54 @@
                                         İşlemlerim
                                     </a>
                                 </li>
+
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                       asp-controller="Rezervasyonlar"
+                                       asp-action="Index">
+                                        Rezervasyonlarım
+                                    </a>
+                                </li>
                             }
-                        </ul>
+                        }
+                    </ul>
 
-                        <ul class="navbar-nav ms-auto">
+                    <ul class="navbar-nav ms-auto align-items-lg-center">
+
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
                             <li class="nav-item dropdown">
-                                <button class="nav-link dropdown-toggle border-0 bg-transparent"
-                                        type="button"
-                                        data-bs-toggle="dropdown"
-                                        aria-expanded="false">
+                                <a class="nav-link dropdown-toggle d-flex align-items-center"
+                                   href="#"
+                                   id="hesapMenusu"
+                                   role="button"
+                                   data-bs-toggle="dropdown"
+                                   aria-expanded="false">
 
-                                    Merhaba,
-                                    <strong>@User.Identity.Name</strong>
+                                    <span class="me-2">
+                                        Merhaba,
+                                        <strong>
+                                            @(User.Identity.Name ?? "Kullanıcı")
+                                        </strong>
+                                    </span>
 
                                     @if (User.IsInRole("Admin"))
                                     {
-                                        <span class="badge bg-danger ms-1">
+                                        <span class="badge bg-danger">
                                             Admin
                                         </span>
                                     }
                                     else
                                     {
-                                        <span class="badge bg-primary ms-1">
+                                        <span class="badge bg-primary">
                                             Üye
                                         </span>
                                     }
-                                </button>
+                                </a>
 
-                                <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                <ul class="dropdown-menu dropdown-menu-end shadow"
+                                    aria-labelledby="hesapMenusu">
+
                                     <li>
                                         <h6 class="dropdown-header">
                                             Hesap İşlemleri
@@ -188,42 +218,40 @@
                                         <form asp-controller="Hesap"
                                               asp-action="Cikis"
                                               method="post">
-
                                             <button type="submit"
-                                                    class="dropdown-item text-danger fw-bold">
+                                                    class="dropdown-item text-danger fw-semibold">
                                                 Çıkış Yap
                                             </button>
                                         </form>
                                     </li>
                                 </ul>
                             </li>
-                        </ul>
-                    }
-                    else
-                    {
-                        <ul class="navbar-nav ms-auto">
+                        }
+                        else
+                        {
                             <li class="nav-item">
-                                <a asp-controller="Hesap"
-                                   asp-action="Giris"
-                                   class="btn btn-outline-primary">
+                                <a class="btn btn-primary"
+                                   asp-controller="Hesap"
+                                   asp-action="Giris">
                                     Giriş Yap
                                 </a>
                             </li>
-                        </ul>
-                    }
+                        }
+
+                    </ul>
                 </div>
             </div>
         </nav>
     </header>
 
-    <main class="container py-4">
+    <main role="main"
+          class="pb-5">
         @RenderBody()
     </main>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; @DateTime.Now.Year -
-            Kütüphane Otomasyonu
+    <footer class="border-top footer text-muted bg-white">
+        <div class="container py-3">
+            &copy; @DateTime.Now.Year - Kütüphane Otomasyonu
         </div>
     </footer>
 
@@ -232,10 +260,12 @@
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
 
     <script src="~/js/site.js"
-            asp-append-version="true"></script>
+            asp-append-version="true">
+    </script>
 
     @await RenderSectionAsync(
         "Scripts",
-        required: false)
+        required: false
+    )
 </body>
 </html>

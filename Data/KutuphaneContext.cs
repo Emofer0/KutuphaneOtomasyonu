@@ -22,6 +22,8 @@ public partial class KutuphaneContext : DbContext
 
     public virtual DbSet<Yazarlar> Yazarlars { get; set; }
 
+    public virtual DbSet<Rezervasyonlar> Rezervasyonlars { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Kategoriler>(entity =>
@@ -81,6 +83,32 @@ public partial class KutuphaneContext : DbContext
 
             entity.ToTable("Yazarlar");
         });
+
+        modelBuilder.Entity<Rezervasyonlar>(entity =>
+{
+    entity.HasKey(e => e.RezervasyonId);
+
+    entity.ToTable("Rezervasyonlar");
+
+    entity.Property(e => e.Durum)
+        .HasMaxLength(20)
+        .HasDefaultValue("Bekliyor");
+
+    entity.Property(e => e.RezervasyonTarihi)
+        .HasDefaultValueSql("(getdate())");
+
+    entity.HasOne(d => d.Kitap)
+        .WithMany()
+        .HasForeignKey(d => d.KitapId)
+        .OnDelete(DeleteBehavior.ClientSetNull)
+        .HasConstraintName("FK_Rezervasyonlar_Kitaplar");
+
+    entity.HasOne(d => d.Uye)
+        .WithMany()
+        .HasForeignKey(d => d.UyeId)
+        .OnDelete(DeleteBehavior.ClientSetNull)
+        .HasConstraintName("FK_Rezervasyonlar_Uyeler");
+});
 
         OnModelCreatingPartial(modelBuilder);
     }

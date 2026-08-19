@@ -2,231 +2,140 @@
 
 @{
     ViewData["Title"] = "Kitap Detayı";
-
-    var adminMi = User.IsInRole("Admin");
-
-    var odunctekiAdet =
-        Model.ToplamAdet - Model.MevcutAdet;
-
-    var aktifIslemler = Model.OduncIslemleris
-        .Where(o => !o.TeslimEdildiMi)
-        .OrderBy(o => o.SonTeslimTarihi)
-        .ToList();
-
-    var gecmisIslemler = Model.OduncIslemleris
-        .Where(o => o.TeslimEdildiMi)
-        .OrderByDescending(o => o.IadeTarihi)
-        .ToList();
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1>@Model.Baslik</h1>
-        <p class="text-muted mb-0">
-            @Model.Yazar?.AdSoyad
-        </p>
-    </div>
-
-    @if (Model.MevcutAdet > 0)
+<div class="container py-5">
+    @if (TempData["Basarili"] != null)
     {
-        <span class="badge bg-success fs-5">
-            Mevcut
-        </span>
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["Basarili"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
+            </button>
+        </div>
     }
-    else
+
+    @if (TempData["Hata"] != null)
     {
-        <span class="badge bg-danger fs-5">
-            Stokta Yok
-        </span>
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["Hata"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
+            </button>
+        </div>
     }
-</div>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <dl class="row mb-0">
-            <dt class="col-sm-3">Kitap Adı</dt>
-            <dd class="col-sm-9">@Model.Baslik</dd>
+    <div class="card border-0 shadow">
+        <div class="card-header text-white p-4"
+             style="background-color:#102a4c;">
 
-            <dt class="col-sm-3">Yazar</dt>
-            <dd class="col-sm-9">
-                @Model.Yazar?.AdSoyad
-            </dd>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h1 class="mb-1">@Model.Baslik</h1>
 
-            <dt class="col-sm-3">Kategori</dt>
-            <dd class="col-sm-9">
-                @Model.Kategori?.Baslik
-            </dd>
+                    <p class="mb-0 opacity-75">
+                        Kitap detayları
+                    </p>
+                </div>
 
-            <dt class="col-sm-3">ISBN</dt>
-            <dd class="col-sm-9">@Model.Isbn</dd>
-
-            <dt class="col-sm-3">Raf Konumu</dt>
-            <dd class="col-sm-9">@Model.RafKonumu</dd>
-        </dl>
-    </div>
-</div>
-
-<div class="row g-4 mb-4">
-    <div class="col-md-4">
-        <div class="card text-bg-primary h-100">
-            <div class="card-body">
-                <h5>Toplam Adet</h5>
-                <h2>@Model.ToplamAdet</h2>
+                @if (Model.MevcutAdet > 0)
+                {
+                    <span class="badge bg-success fs-6">
+                        Mevcut
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-danger fs-6">
+                        Stokta Yok
+                    </span>
+                }
             </div>
         </div>
-    </div>
 
-    <div class="col-md-4">
-        <div class="card text-bg-success h-100">
-            <div class="card-body">
-                <h5>Mevcut Adet</h5>
-                <h2>@Model.MevcutAdet</h2>
-            </div>
-        </div>
-    </div>
+        <div class="card-body p-4">
+            <div class="row">
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4">ISBN</dt>
+                        <dd class="col-sm-8">@Model.Isbn</dd>
 
-    @if (adminMi)
-    {
-        <div class="col-md-4">
-            <div class="card text-bg-warning h-100">
-                <div class="card-body">
-                    <h5>Ödünçteki Adet</h5>
-                    <h2>@odunctekiAdet</h2>
+                        <dt class="col-sm-4">Kitap Adı</dt>
+                        <dd class="col-sm-8">@Model.Baslik</dd>
+
+                        <dt class="col-sm-4">Yazar</dt>
+                        <dd class="col-sm-8">
+                            @(Model.Yazar?.AdSoyad ?? "-")
+                        </dd>
+
+                        <dt class="col-sm-4">Kategori</dt>
+                        <dd class="col-sm-8">
+                            @(Model.Kategori?.Baslik ?? "-")
+                        </dd>
+                    </dl>
+                </div>
+
+                <div class="col-md-6">
+                    <dl class="row">
+                        <dt class="col-sm-4">Raf Konumu</dt>
+                        <dd class="col-sm-8">@Model.RafKonumu</dd>
+
+                        <dt class="col-sm-4">Toplam Adet</dt>
+                        <dd class="col-sm-8">@Model.ToplamAdet</dd>
+
+                        <dt class="col-sm-4">Mevcut Adet</dt>
+                        <dd class="col-sm-8">@Model.MevcutAdet</dd>
+                    </dl>
                 </div>
             </div>
+
+            <hr />
+
+            <div class="d-flex flex-wrap gap-2">
+                <a asp-action="Index"
+                   class="btn btn-outline-secondary">
+                    Kitaplara Dön
+                </a>
+
+                @if (User.IsInRole("Admin"))
+                {
+                    <a asp-action="Edit"
+                       asp-route-id="@Model.KitapId"
+                       class="btn btn-warning">
+                        Kitabı Düzenle
+                    </a>
+                }
+
+                @if (User.IsInRole("Uye") && Model.MevcutAdet <= 0)
+                {
+                    <form asp-controller="Rezervasyonlar"
+                          asp-action="Ayirt"
+                          method="post">
+
+                        <input type="hidden"
+                               name="kitapId"
+                               value="@Model.KitapId" />
+
+                        <button type="submit"
+                                class="btn btn-primary"
+                                onclick="return confirm('Bu kitabı ayırtmak istediğinize emin misiniz?')">
+                            Kitabı Ayırt
+                        </button>
+                    </form>
+                }
+            </div>
+
+            @if (User.IsInRole("Uye") && Model.MevcutAdet > 0)
+            {
+                <div class="alert alert-info mt-4 mb-0">
+                    Bu kitap şu anda kütüphanede mevcut olduğu için
+                    rezervasyon yapılamaz.
+                </div>
+            }
         </div>
-    }
-</div>
-
-@if (adminMi)
-{
-    <h2>Aktif Ödünç İşlemleri</h2>
-
-    @if (!aktifIslemler.Any())
-    {
-        <div class="alert alert-info">
-            Bu kitap şu anda hiçbir üyede değil.
-        </div>
-    }
-    else
-    {
-        <div class="table-responsive mb-4">
-            <table class="table table-bordered table-striped align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Üye</th>
-                        <th>Veriliş Tarihi</th>
-                        <th>Son Teslim Tarihi</th>
-                        <th>Durum</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    @foreach (var islem in aktifIslemler)
-                    {
-                        var geciktiMi =
-                            islem.SonTeslimTarihi.Date <
-                            DateTime.Today;
-
-                        <tr class="@(geciktiMi
-                            ? "table-danger"
-                            : "")">
-
-                            <td>
-                                <a asp-controller="Uyeler"
-                                   asp-action="Details"
-                                   asp-route-id="@islem.UyeId">
-                                    @islem.Uye?.AdSoyad
-                                </a>
-                            </td>
-
-                            <td>
-                                @islem.VerilisTarihi.ToString("dd.MM.yyyy")
-                            </td>
-
-                            <td>
-                                @islem.SonTeslimTarihi.ToString("dd.MM.yyyy")
-                            </td>
-
-                            <td>
-                                @if (geciktiMi)
-                                {
-                                    <span class="badge bg-danger">
-                                        Gecikti
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-warning text-dark">
-                                        Ödünçte
-                                    </span>
-                                }
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-
-    <h2>Geçmiş İade İşlemleri</h2>
-
-    @if (!gecmisIslemler.Any())
-    {
-        <div class="alert alert-info">
-            Tamamlanmış iade işlemi bulunmuyor.
-        </div>
-    }
-    else
-    {
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Üye</th>
-                        <th>Veriliş Tarihi</th>
-                        <th>İade Tarihi</th>
-                        <th>Ceza</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-                    @foreach (var islem in gecmisIslemler)
-                    {
-                        <tr>
-                            <td>@islem.Uye?.AdSoyad</td>
-
-                            <td>
-                                @islem.VerilisTarihi.ToString("dd.MM.yyyy")
-                            </td>
-
-                            <td>
-                                @(islem.IadeTarihi?.ToString("dd.MM.yyyy") ?? "-")
-                            </td>
-
-                            <td>
-                                @islem.CezaTutari.ToString("N2") TL
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
-}
-
-<div class="mt-4">
-    @if (adminMi)
-    {
-        <a asp-action="Edit"
-           asp-route-id="@Model.KitapId"
-           class="btn btn-warning">
-            Kitabı Düzenle
-        </a>
-    }
-
-    <a asp-action="Index"
-       class="btn btn-secondary">
-        Listeye Dön
-    </a>
+    </div>
 </div>
