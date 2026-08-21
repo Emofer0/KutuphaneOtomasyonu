@@ -282,12 +282,24 @@ namespace KutuphaneOtomasyonu.Controllers
                 "Baslik",
                 secilenKitapId);
 
-            ViewData["UyeId"] = new SelectList(
-                _context.Uyelers
-                    .OrderBy(u => u.AdSoyad),
-                "UyeId",
-                "AdSoyad",
-                secilenUyeId);
+            var uyeler = _context.Uyelers
+    .Where(u => u.Rol == "Uye")
+    .OrderBy(u => u.AdSoyad)
+    .Select(u => new
+    {
+        u.UyeId,
+        GorunenAd = "ID: " + u.UyeId
+            + " - " + u.AdSoyad
+            + " (" + u.Eposta + ")"
+    })
+    .ToList();
+
+ViewData["UyeId"] = new SelectList(
+    uyeler,
+    "UyeId",
+    "GorunenAd",
+    secilenUyeId
+);
         }
     }
 }
