@@ -49,6 +49,7 @@
                         aria-controls="anaMenu"
                         aria-expanded="false"
                         aria-label="Menüyü aç">
+
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
@@ -151,6 +152,7 @@
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item dropdown">
+
                                 <a class="nav-link dropdown-toggle d-flex align-items-center"
                                    href="#"
                                    id="hesapMenusu"
@@ -217,7 +219,9 @@
                                     <li>
                                         <form asp-controller="Hesap"
                                               asp-action="Cikis"
-                                              method="post">
+                                              method="post"
+                                              class="m-0">
+
                                             <button type="submit"
                                                     class="dropdown-item text-danger fw-semibold">
                                                 Çıkış Yap

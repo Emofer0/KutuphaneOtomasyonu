@@ -19,5 +19,7 @@ public partial class Uyeler
 
     public string Rol { get; set; } = null!;
 
+    public bool AktifMi { get; set; }
+
     public virtual ICollection<OduncIslemleri> OduncIslemleris { get; set; } = new List<OduncIslemleri>();
 }

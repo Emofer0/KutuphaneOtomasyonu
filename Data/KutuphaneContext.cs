@@ -74,6 +74,8 @@ public partial class KutuphaneContext : DbContext
             entity.ToTable("Uyeler");
 
             entity.Property(e => e.Rol).HasDefaultValue("");
+            entity.Property(e => e.AktifMi)
+    .HasDefaultValue(true);
             entity.Property(e => e.Sifre).HasDefaultValue("");
         });
 
