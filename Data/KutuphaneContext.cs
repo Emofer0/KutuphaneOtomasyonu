@@ -35,6 +35,14 @@ public partial class KutuphaneContext : DbContext
 
         modelBuilder.Entity<Kitaplar>(entity =>
         {
+            entity.Property(e => e.AktifMi)
+    .HasDefaultValue(true);
+
+            entity.Property(e => e.PasifeAlmaNedeni)
+    .HasMaxLength(100);
+
+            entity.Property(e => e.PasifeAlmaTarihi);
+
             entity.HasKey(e => e.KitapId);
 
             entity.ToTable("Kitaplar");

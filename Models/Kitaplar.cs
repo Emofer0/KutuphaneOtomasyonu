@@ -21,6 +21,12 @@ public partial class Kitaplar
 
     public int MevcutAdet { get; set; }
 
+    public bool AktifMi { get; set; }
+
+public string? PasifeAlmaNedeni { get; set; }
+
+public DateTime? PasifeAlmaTarihi { get; set; }
+
     public virtual Kategoriler Kategori { get; set; } = null!;
 
     public virtual ICollection<OduncIslemleri> OduncIslemleris { get; set; } = new List<OduncIslemleri>();
