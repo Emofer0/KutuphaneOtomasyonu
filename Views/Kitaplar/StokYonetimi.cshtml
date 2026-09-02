@@ -1,0 +1,424 @@
+@model KutuphaneOtomasyonu.Models.Kitaplar
+
+@{
+    ViewData["Title"] = "Stok Yönetimi";
+
+    int odunctekiAdet =
+        Convert.ToInt32(ViewBag.OdunctekiAdet);
+
+    int bekleyenRezervasyon =
+        Convert.ToInt32(ViewBag.BekleyenRezervasyon);
+
+    bool butunKopyalarRafta =
+        Model.AktifMi &&
+        Model.MevcutAdet == Model.ToplamAdet &&
+        odunctekiAdet == 0;
+}
+
+<div class="container py-4">
+
+    @if (TempData["BasariliMesaj"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["BasariliMesaj"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
+            </button>
+        </div>
+    }
+
+    @if (TempData["HataMesaji"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["HataMesaji"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
+            </button>
+        </div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">Stok Yönetimi</h1>
+
+            <p class="text-muted mb-0">
+                @Model.Baslik
+            </p>
+        </div>
+
+        <a asp-action="Index"
+           class="btn btn-outline-secondary">
+            Kitaplara Dön
+        </a>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h2 class="h4 mb-1">
+                        @Model.Baslik
+                    </h2>
+
+                    <div class="text-muted">
+                        @(Model.Yazar?.AdSoyad ?? "-")
+                        ·
+                        @(Model.Kategori?.Baslik ?? "-")
+                    </div>
+
+                    <div class="small text-muted mt-1">
+                        ISBN: @Model.Isbn
+                    </div>
+                </div>
+
+                @if (Model.AktifMi)
+                {
+                    <span class="badge bg-success fs-6">
+                        Aktif
+                    </span>
+                }
+                else
+                {
+                    <span class="badge bg-dark fs-6">
+                        Pasif
+                    </span>
+                }
+            </div>
+
+            @if (!Model.AktifMi)
+            {
+                <hr />
+
+                <div class="alert alert-secondary mb-0">
+                    <strong>Pasife alma nedeni:</strong>
+
+                    @(Model.PasifeAlmaNedeni ?? "Belirtilmedi")
+
+                    @if (Model.PasifeAlmaTarihi.HasValue)
+                    {
+                        <br />
+
+                        <strong>Tarih:</strong>
+
+                        @(Model.PasifeAlmaTarihi.Value.ToString("dd.MM.yyyy HH:mm"))
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <div class="card border-primary h-100">
+                <div class="card-body">
+                    <div class="text-muted">
+                        Toplam Kopya
+                    </div>
+
+                    <div class="display-6">
+                        @Model.ToplamAdet
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-success h-100">
+                <div class="card-body">
+                    <div class="text-muted">
+                        Rafta
+                    </div>
+
+                    <div class="display-6">
+                        @Model.MevcutAdet
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-warning h-100">
+                <div class="card-body">
+                    <div class="text-muted">
+                        Ödünçte
+                    </div>
+
+                    <div class="display-6">
+                        @odunctekiAdet
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card border-info h-100">
+                <div class="card-body">
+                    <div class="text-muted">
+                        Bekleyen Rezervasyon
+                    </div>
+
+                    <div class="display-6">
+                        @bekleyenRezervasyon
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    @if (Model.AktifMi)
+    {
+        <div class="row g-4">
+
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+
+                    <div class="card-header bg-success text-white">
+                        Kopya Artır
+                    </div>
+
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Kütüphaneye yeni gelen fiziksel
+                            kopyaları stoğa ekler.
+                        </p>
+
+                        <form asp-action="KopyaArtir"
+                              method="post">
+
+                            <input type="hidden"
+                                   name="id"
+                                   value="@Model.KitapId" />
+
+                            <div class="mb-3">
+                                <label class="form-label">
+                                    Eklenecek kopya sayısı
+                                </label>
+
+                                <input type="number"
+                                       name="adet"
+                                       value="1"
+                                       min="1"
+                                       class="form-control"
+                                       required />
+                            </div>
+
+                            <button type="submit"
+                                    class="btn btn-success"
+                                    onclick="return confirm('Yeni kopyalar stoğa eklensin mi?')">
+                                Kopya Artır
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card border-0 shadow-sm h-100">
+
+                    <div class="card-header bg-danger text-white">
+                        Kopya Azalt
+                    </div>
+
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Yalnızca rafta bulunan fiziksel
+                            kopyalar stoktan çıkarılabilir.
+                        </p>
+
+                        @if (Model.MevcutAdet > 0)
+                        {
+                            <form asp-action="KopyaAzalt"
+                                  method="post">
+
+                                <input type="hidden"
+                                       name="id"
+                                       value="@Model.KitapId" />
+
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        Çıkarılacak kopya sayısı
+                                    </label>
+
+                                    <input type="number"
+                                           name="adet"
+                                           value="1"
+                                           min="1"
+                                           max="@Model.MevcutAdet"
+                                           class="form-control"
+                                           required />
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">
+                                        Çıkarma nedeni
+                                    </label>
+
+                                    <select name="neden"
+                                            class="form-select"
+                                            required>
+
+                                        <option value="">
+                                            Neden seçiniz
+                                        </option>
+
+                                        <option value="Kayıp">
+                                            Kayıp
+                                        </option>
+
+                                        <option value="Hasarlı">
+                                            Hasarlı
+                                        </option>
+
+                                        <option value="Fiziksel stoktan çıkarıldı">
+                                            Fiziksel stoktan çıkarıldı
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <button type="submit"
+                                        class="btn btn-danger"
+                                        onclick="return confirm('Seçilen kopyalar stoktan çıkarılsın mı?')">
+                                    Kopya Azalt
+                                </button>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning mb-0">
+                                Rafta azaltılabilecek kopya bulunmuyor.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12">
+                <div class="card border-dark shadow-sm">
+
+                    <div class="card-header bg-dark text-white">
+                        Kitabın Tamamını Pasife Al
+                    </div>
+
+                    <div class="card-body">
+                        <p class="text-muted">
+                            Kitabı üye kataloğundan kaldırır,
+                            mevcut adedi sıfırlar ve bekleyen
+                            rezervasyonları iptal eder.
+                        </p>
+
+                        @if (butunKopyalarRafta)
+                        {
+                            <form asp-action="PasifeAl"
+                                  method="post"
+                                  class="row g-3 align-items-end">
+
+                                <input type="hidden"
+                                       name="id"
+                                       value="@Model.KitapId" />
+
+                                <div class="col-md-8">
+                                    <label class="form-label">
+                                        Pasife alma nedeni
+                                    </label>
+
+                                    <select name="neden"
+                                            class="form-select"
+                                            required>
+
+                                        <option value="">
+                                            Neden seçiniz
+                                        </option>
+
+                                        <option value="Yasaklandı">
+                                            Yasaklandı
+                                        </option>
+
+                                        <option value="Katalogdan çıkarıldı">
+                                            Katalogdan çıkarıldı
+                                        </option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <button type="submit"
+                                            class="btn btn-dark w-100"
+                                            onclick="return confirm('Kitabın tamamı pasife alınsın mı?')">
+                                        Pasife Al
+                                    </button>
+                                </div>
+                            </form>
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning mb-0">
+                                Kitabın tamamı pasife alınamaz.
+                                Önce ödünçteki bütün kopyaların
+                                iade edilmesi gerekir.
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    }
+    else
+    {
+        <div class="card border-success shadow-sm">
+
+            <div class="card-header bg-success text-white">
+                Kitabı Yeniden Aktif Et
+            </div>
+
+            <div class="card-body">
+                <p>
+                    Kitap yeniden kataloğa ve ödünç
+                    işlemlerine açılsın.
+                </p>
+
+                <form asp-action="AktifEt"
+                      method="post">
+
+                    <input type="hidden"
+                           name="id"
+                           value="@Model.KitapId" />
+
+                    <button type="submit"
+                            class="btn btn-success"
+                            onclick="return confirm('Kitap yeniden aktif edilsin mi?')">
+                        Aktif Et
+                    </button>
+                </form>
+            </div>
+        </div>
+    }
+
+    <div class="card border-danger shadow-sm mt-4">
+
+        <div class="card-header text-danger fw-bold">
+            Tehlikeli İşlemler
+        </div>
+
+        <div class="card-body">
+            <p class="text-muted">
+                Yalnızca ödünç veya rezervasyon geçmişi
+                bulunmayan, yanlışlıkla oluşturulmuş kitap
+                tamamen silinebilir.
+            </p>
+
+            <a asp-action="Delete"
+               asp-route-id="@Model.KitapId"
+               class="btn btn-outline-danger">
+                Kitabı Tamamen Sil
+            </a>
+        </div>
+    </div>
+
+</div>

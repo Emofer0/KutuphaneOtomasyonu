@@ -2,7 +2,7 @@
 
 @{
     ViewData["Title"] = "Kitaplar";
-    var adminMi = User.IsInRole("Admin");
+    bool adminMi = User.IsInRole("Admin");
 }
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -19,15 +19,25 @@
 
 @if (TempData["BasariliMesaj"] != null)
 {
-    <div class="alert alert-success">
+    <div class="alert alert-success alert-dismissible fade show">
         @TempData["BasariliMesaj"]
+
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+        </button>
     </div>
 }
 
 @if (TempData["HataMesaji"] != null)
 {
-    <div class="alert alert-danger">
+    <div class="alert alert-danger alert-dismissible fade show">
         @TempData["HataMesaji"]
+
+        <button type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+        </button>
     </div>
 }
 
@@ -64,6 +74,7 @@ else
 {
     <div class="table-responsive">
         <table class="table table-striped table-bordered align-middle">
+
             <thead class="table-dark">
                 <tr>
                     <th>ISBN</th>
@@ -85,7 +96,10 @@ else
             <tbody>
                 @foreach (var item in Model)
                 {
-                    <tr>
+                    <tr class="@(!item.AktifMi
+                        ? "table-secondary"
+                        : "")">
+
                         <td>@item.Isbn</td>
 
                         <td>
@@ -96,14 +110,37 @@ else
                             </a>
                         </td>
 
-                        <td>@item.Yazar?.AdSoyad</td>
-                        <td>@item.Kategori?.Baslik</td>
-                        <td>@item.RafKonumu</td>
+                        <td>
+                            @(item.Yazar?.AdSoyad ?? "-")
+                        </td>
+
+                        <td>
+                            @(item.Kategori?.Baslik ?? "-")
+                        </td>
+
+                        <td>
+                            @(item.RafKonumu ?? "-")
+                        </td>
+
                         <td>@item.ToplamAdet</td>
                         <td>@item.MevcutAdet</td>
 
                         <td>
-                            @if (item.MevcutAdet > 0)
+                            @if (!item.AktifMi)
+                            {
+                                <span class="badge bg-dark">
+                                    Pasif
+                                </span>
+
+                                @if (!string.IsNullOrWhiteSpace(
+                                    item.PasifeAlmaNedeni))
+                                {
+                                    <div class="small text-muted mt-1">
+                                        @item.PasifeAlmaNedeni
+                                    </div>
+                                }
+                            }
+                            else if (item.MevcutAdet > 0)
                             {
                                 <span class="badge bg-success">
                                     Mevcut
@@ -120,23 +157,27 @@ else
                         @if (adminMi)
                         {
                             <td>
-                                <a asp-action="Edit"
-                                   asp-route-id="@item.KitapId"
-                                   class="btn btn-warning btn-sm">
-                                    Düzenle
-                                </a>
+                                <div class="d-flex flex-wrap gap-2">
 
-                                <a asp-action="Details"
-                                   asp-route-id="@item.KitapId"
-                                   class="btn btn-info btn-sm">
-                                    Detay
-                                </a>
+                                    <a asp-action="Edit"
+                                       asp-route-id="@item.KitapId"
+                                       class="btn btn-warning btn-sm">
+                                        Düzenle
+                                    </a>
 
-                                <a asp-action="Delete"
-                                   asp-route-id="@item.KitapId"
-                                   class="btn btn-danger btn-sm">
-                                    Sil
-                                </a>
+                                    <a asp-action="Details"
+                                       asp-route-id="@item.KitapId"
+                                       class="btn btn-info btn-sm">
+                                        Detay
+                                    </a>
+
+                                    <a asp-action="StokYonetimi"
+                                       asp-route-id="@item.KitapId"
+                                       class="btn btn-primary btn-sm">
+                                        Stok Yönetimi
+                                    </a>
+
+                                </div>
                             </td>
                         }
                     </tr>
