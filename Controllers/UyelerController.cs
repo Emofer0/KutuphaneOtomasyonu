@@ -1,6 +1,7 @@
 using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,10 +11,12 @@ namespace KutuphaneOtomasyonu.Controllers;
 public class UyelerController : Controller
 {
     private readonly KutuphaneContext _context;
+    private readonly PasswordHasher<Uyeler> _passwordHasher;
 
     public UyelerController(KutuphaneContext context)
     {
         _context = context;
+        _passwordHasher = new PasswordHasher<Uyeler>();
     }
 
     // Üyeleri listeleme ve arama
@@ -40,7 +43,7 @@ public class UyelerController : Controller
         return View(uyeler);
     }
 
-    // Üye detay sayfası
+    // Üye detayları
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null)
@@ -51,7 +54,8 @@ public class UyelerController : Controller
         var uye = await _context.Uyelers
             .Include(u => u.OduncIslemleris)
                 .ThenInclude(o => o.Kitap)
-            .FirstOrDefaultAsync(u => u.UyeId == id);
+            .FirstOrDefaultAsync(u =>
+                u.UyeId == id.Value);
 
         if (uye == null)
         {
@@ -61,7 +65,7 @@ public class UyelerController : Controller
         return View(uye);
     }
 
-    // Yeni üye formu
+    // Yeni üye sayfası
     [HttpGet]
     public IActionResult Create()
     {
@@ -71,42 +75,110 @@ public class UyelerController : Controller
     // Yeni üyeyi kaydetme
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Create(Uyeler uye)
+    public async Task<IActionResult> Create(
+        string? adSoyad,
+        string? eposta,
+        string? telefon,
+        string? sifre)
     {
-        bool epostaKullaniliyor =
-            await _context.Uyelers.AnyAsync(u =>
-                u.Eposta == uye.Eposta);
+        var formModeli = new Uyeler
+        {
+            AdSoyad = adSoyad?.Trim() ?? "",
+            Eposta = eposta?.Trim() ?? "",
+            Telefon = telefon?.Trim(),
+            Sifre = "",
+            Rol = "Uye",
+            KayitTarihi = DateTime.Now,
+            AktifMi = true
+        };
 
-        if (epostaKullaniliyor)
+        if (string.IsNullOrWhiteSpace(adSoyad))
         {
             ModelState.AddModelError(
-                nameof(uye.Eposta),
-                "Bu e-posta adresi başka bir hesap tarafından kullanılıyor.");
+                "AdSoyad",
+                "Ad soyad alanı zorunludur.");
+        }
+
+        if (string.IsNullOrWhiteSpace(eposta))
+        {
+            ModelState.AddModelError(
+                "Eposta",
+                "E-posta alanı zorunludur.");
+        }
+
+        if (string.IsNullOrWhiteSpace(sifre))
+        {
+            ModelState.AddModelError(
+                "Sifre",
+                "Şifre alanı zorunludur.");
+        }
+        else if (sifre.Length < 6)
+        {
+            ModelState.AddModelError(
+                "Sifre",
+                "Şifre en az 6 karakter olmalıdır.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(eposta))
+        {
+            string temizEposta = eposta.Trim();
+
+            bool epostaKullaniliyor =
+                await _context.Uyelers.AnyAsync(u =>
+                    u.Eposta == temizEposta);
+
+            if (epostaKullaniliyor)
+            {
+                ModelState.AddModelError(
+                    "Eposta",
+                    "Bu e-posta adresi başka bir hesap tarafından kullanılıyor.");
+            }
         }
 
         if (!ModelState.IsValid)
         {
-            return View(uye);
+            return View(formModeli);
         }
 
-        uye.KayitTarihi = DateTime.Now;
-        uye.AktifMi = true;
-
-        if (string.IsNullOrWhiteSpace(uye.Rol))
+        var yeniUye = new Uyeler
         {
-            uye.Rol = "Uye";
+            AdSoyad = adSoyad!.Trim(),
+            Eposta = eposta!.Trim(),
+            Telefon = string.IsNullOrWhiteSpace(telefon)
+                ? null
+                : telefon.Trim(),
+            KayitTarihi = DateTime.Now,
+            Rol = "Uye",
+            AktifMi = true,
+            Sifre = ""
+        };
+
+        yeniUye.Sifre = _passwordHasher.HashPassword(
+            yeniUye,
+            sifre!);
+
+        _context.Uyelers.Add(yeniUye);
+
+        try
+        {
+            await _context.SaveChangesAsync();
+
+            TempData["Basarili"] =
+                "Yeni üye hesabı başarıyla oluşturuldu.";
+
+            return RedirectToAction(nameof(Index));
         }
+        catch (DbUpdateException)
+        {
+            ModelState.AddModelError(
+                "",
+                "Üye kaydedilemedi. E-posta adresinin daha önce kullanılmadığından emin olun.");
 
-        _context.Uyelers.Add(uye);
-        await _context.SaveChangesAsync();
-
-        TempData["Basarili"] =
-            "Yeni üye başarıyla oluşturuldu.";
-
-        return RedirectToAction(nameof(Index));
+            return View(formModeli);
+        }
     }
 
-    // Üye düzenleme formu
+    // Üye düzenleme sayfası
     [HttpGet]
     public async Task<IActionResult> Edit(int? id)
     {
@@ -115,7 +187,8 @@ public class UyelerController : Controller
             return NotFound();
         }
 
-        var uye = await _context.Uyelers.FindAsync(id);
+        var uye = await _context.Uyelers
+            .FindAsync(id.Value);
 
         if (uye == null)
         {
@@ -130,41 +203,65 @@ public class UyelerController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Edit(
         int id,
-        Uyeler uye)
+        string? adSoyad,
+        string? eposta,
+        string? telefon)
     {
-        if (id != uye.UyeId)
-        {
-            return NotFound();
-        }
-
-        bool epostaKullaniliyor =
-            await _context.Uyelers.AnyAsync(u =>
-                u.Eposta == uye.Eposta &&
-                u.UyeId != uye.UyeId);
-
-        if (epostaKullaniliyor)
-        {
-            ModelState.AddModelError(
-                nameof(uye.Eposta),
-                "Bu e-posta adresi başka bir hesap tarafından kullanılıyor.");
-        }
-
-        if (!ModelState.IsValid)
-        {
-            return View(uye);
-        }
-
         var mevcutUye = await _context.Uyelers
-            .FirstOrDefaultAsync(u => u.UyeId == id);
+            .FirstOrDefaultAsync(u =>
+                u.UyeId == id);
 
         if (mevcutUye == null)
         {
             return NotFound();
         }
 
-        mevcutUye.AdSoyad = uye.AdSoyad;
-        mevcutUye.Eposta = uye.Eposta;
-        mevcutUye.Telefon = uye.Telefon;
+        if (string.IsNullOrWhiteSpace(adSoyad))
+        {
+            ModelState.AddModelError(
+                "AdSoyad",
+                "Ad soyad alanı zorunludur.");
+        }
+
+        if (string.IsNullOrWhiteSpace(eposta))
+        {
+            ModelState.AddModelError(
+                "Eposta",
+                "E-posta alanı zorunludur.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(eposta))
+        {
+            string temizEposta = eposta.Trim();
+
+            bool epostaKullaniliyor =
+                await _context.Uyelers.AnyAsync(u =>
+                    u.Eposta == temizEposta &&
+                    u.UyeId != id);
+
+            if (epostaKullaniliyor)
+            {
+                ModelState.AddModelError(
+                    "Eposta",
+                    "Bu e-posta adresi başka bir hesap tarafından kullanılıyor.");
+            }
+        }
+
+        if (!ModelState.IsValid)
+        {
+            mevcutUye.AdSoyad = adSoyad?.Trim() ?? "";
+            mevcutUye.Eposta = eposta?.Trim() ?? "";
+            mevcutUye.Telefon = telefon?.Trim();
+
+            return View(mevcutUye);
+        }
+
+        mevcutUye.AdSoyad = adSoyad!.Trim();
+        mevcutUye.Eposta = eposta!.Trim();
+        mevcutUye.Telefon =
+            string.IsNullOrWhiteSpace(telefon)
+                ? null
+                : telefon.Trim();
 
         await _context.SaveChangesAsync();
 
@@ -180,7 +277,8 @@ public class UyelerController : Controller
     public async Task<IActionResult> PasifeAl(int id)
     {
         var uye = await _context.Uyelers
-            .FirstOrDefaultAsync(u => u.UyeId == id);
+            .FirstOrDefaultAsync(u =>
+                u.UyeId == id);
 
         if (uye == null)
         {
@@ -204,7 +302,6 @@ public class UyelerController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        // Üyenin teslim etmediği kitapları getirir.
         var teslimEdilmemisIslemler =
             await _context.OduncIslemleris
                 .Where(o =>
@@ -212,31 +309,22 @@ public class UyelerController : Controller
                     !o.TeslimEdildiMi)
                 .ToListAsync();
 
-        // Teslim edilmemiş kitap varsa pasife alınamaz.
         if (teslimEdilmemisIslemler.Any())
         {
             bool gecikenKitapVar =
                 teslimEdilmemisIslemler.Any(o =>
-                    o.SonTeslimTarihi < DateTime.Now);
+                    o.SonTeslimTarihi.Date <
+                    DateTime.Today);
 
-            if (gecikenKitapVar)
-            {
-                TempData["Hata"] =
-                    "Bu üyenin gecikmiş ve henüz teslim edilmemiş kitabı bulunmaktadır. Kitap iade edilmeden üye pasife alınamaz.";
-            }
-            else
-            {
-                TempData["Hata"] =
-                    "Bu üyenin henüz teslim etmediği kitabı bulunmaktadır. Kitap iade edilmeden üye pasife alınamaz.";
-            }
+            TempData["Hata"] = gecikenKitapVar
+                ? "Üyenin gecikmiş ve teslim edilmemiş kitabı bulunduğu için pasife alınamaz."
+                : "Üyenin teslim edilmemiş kitabı bulunduğu için pasife alınamaz.";
 
             return RedirectToAction(nameof(Index));
         }
 
-        // Teslim edilmemiş kitabı yoksa pasife alınır.
         uye.AktifMi = false;
 
-        // Bekleyen rezervasyonları bulur.
         var bekleyenRezervasyonlar =
             await _context.Rezervasyonlars
                 .Where(r =>
@@ -244,7 +332,6 @@ public class UyelerController : Controller
                     r.Durum == "Bekliyor")
                 .ToListAsync();
 
-        // Bekleyen rezervasyonları iptal eder.
         foreach (var rezervasyon in bekleyenRezervasyonlar)
         {
             rezervasyon.Durum = "İptal";
@@ -252,17 +339,10 @@ public class UyelerController : Controller
 
         await _context.SaveChangesAsync();
 
-        if (bekleyenRezervasyonlar.Any())
-        {
-            TempData["Basarili"] =
-                $"Üye pasife alındı. Üyeye ait " +
-                $"{bekleyenRezervasyonlar.Count} bekleyen rezervasyon iptal edildi.";
-        }
-        else
-        {
-            TempData["Basarili"] =
-                "Üye başarıyla pasife alındı.";
-        }
+        TempData["Basarili"] =
+            bekleyenRezervasyonlar.Any()
+                ? $"Üye pasife alındı ve {bekleyenRezervasyonlar.Count} bekleyen rezervasyonu iptal edildi."
+                : "Üye başarıyla pasife alındı.";
 
         return RedirectToAction(nameof(Index));
     }
@@ -273,7 +353,8 @@ public class UyelerController : Controller
     public async Task<IActionResult> AktifEt(int id)
     {
         var uye = await _context.Uyelers
-            .FirstOrDefaultAsync(u => u.UyeId == id);
+            .FirstOrDefaultAsync(u =>
+                u.UyeId == id);
 
         if (uye == null)
         {

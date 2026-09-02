@@ -297,7 +297,10 @@ public class RezervasyonlarController : Controller
 
         if (rezervasyon == null)
         {
-            return NotFound();
+            TempData["Hata"] =
+                "Rezervasyon bulunamadı.";
+
+            return RedirectToAction(nameof(Index));
         }
 
         if (User.IsInRole("Uye"))
@@ -329,7 +332,7 @@ public class RezervasyonlarController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // Rezervasyonu tamamlamak yalnızca admine açıktır.
+    // Rezervasyonu ödünç işlemine dönüştürür.
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Roles = "Admin")]
@@ -337,30 +340,100 @@ public class RezervasyonlarController : Controller
     {
         var rezervasyon =
             await _context.Rezervasyonlars
+                .Include(r => r.Kitap)
+                .Include(r => r.Uye)
                 .FirstOrDefaultAsync(r =>
                     r.RezervasyonId == id);
 
         if (rezervasyon == null)
         {
-            return NotFound();
+            TempData["Hata"] =
+                "Rezervasyon bulunamadı.";
+
+            return RedirectToAction(nameof(Index));
         }
 
         if (rezervasyon.Durum != "Bekliyor")
         {
             TempData["Hata"] =
-                "Yalnızca bekleyen rezervasyonlar tamamlanabilir.";
+                "Yalnızca bekleyen rezervasyonlar ödünç işlemine dönüştürülebilir.";
 
             return RedirectToAction(nameof(Index));
         }
 
+        if (!rezervasyon.Uye.AktifMi)
+        {
+            TempData["Hata"] =
+                "Üye pasif durumda olduğu için kitap ödünç verilemez.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        if (rezervasyon.Kitap.MevcutAdet <= 0)
+        {
+            TempData["Hata"] =
+                "Kitap henüz stokta bulunmuyor. Kitap iade edilmeden rezervasyon tamamlanamaz.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        bool kitapZatenUyede =
+            await _context.OduncIslemleris
+                .AnyAsync(o =>
+                    o.UyeId == rezervasyon.UyeId &&
+                    o.KitapId == rezervasyon.KitapId &&
+                    !o.TeslimEdildiMi);
+
+        if (kitapZatenUyede)
+        {
+            TempData["Hata"] =
+                "Bu kitap zaten ilgili üyede ödünç olarak görünüyor.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        DateTime verilisTarihi = DateTime.Now;
+
+        var yeniOduncIslemi =
+            new OduncIslemleri
+            {
+                KitapId = rezervasyon.KitapId,
+                UyeId = rezervasyon.UyeId,
+                VerilisTarihi = verilisTarihi,
+                SonTeslimTarihi =
+                    verilisTarihi.AddDays(14),
+                IadeTarihi = null,
+                TeslimEdildiMi = false,
+                CezaTutari = 0
+            };
+
+        _context.OduncIslemleris.Add(
+            yeniOduncIslemi);
+
+        // Kitabın mevcut adedi bir azaltılır.
+        rezervasyon.Kitap.MevcutAdet--;
+
+        // Rezervasyon tamamlandı yapılır.
         rezervasyon.Durum = "Tamamlandı";
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
 
-        TempData["Basarili"] =
-            "Rezervasyon tamamlandı olarak işaretlendi.";
+            TempData["Basarili"] =
+                "Rezervasyon tamamlandı ve kitap üyeye 14 gün süreyle ödünç verildi.";
 
-        return RedirectToAction(nameof(Index));
+            return RedirectToAction(
+                "Index",
+                "OduncIslemleri");
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Hata"] =
+                "Rezervasyon ödünç işlemine dönüştürülürken bir hata oluştu.";
+
+            return RedirectToAction(nameof(Index));
+        }
     }
 
     // Admin rezervasyon formundaki listeleri hazırlar.
@@ -368,48 +441,56 @@ public class RezervasyonlarController : Controller
         int? secilenKitapId = null,
         int? secilenUyeId = null)
     {
-        var kitaplar = await _context.Kitaplars
-            .Where(k => k.MevcutAdet <= 0)
-            .OrderBy(k => k.Baslik)
-            .Select(k => new
-            {
-                k.KitapId,
+        var kitaplar =
+            await _context.Kitaplars
+                .Where(k =>
+                    k.MevcutAdet <= 0)
+                .OrderBy(k =>
+                    k.Baslik)
+                .Select(k => new
+                {
+                    k.KitapId,
 
-                GorunenAd =
-                    "ID: " + k.KitapId +
-                    " - " + k.Baslik
-            })
-            .ToListAsync();
+                    GorunenAd =
+                        "ID: " + k.KitapId +
+                        " - " + k.Baslik
+                })
+                .ToListAsync();
 
-        var uyeler = await _context.Uyelers
-            .Where(u =>
-                u.Rol == "Uye" &&
-                u.AktifMi)
-            .OrderBy(u => u.AdSoyad)
-            .Select(u => new
-            {
-                u.UyeId,
+        var uyeler =
+            await _context.Uyelers
+                .Where(u =>
+                    u.Rol == "Uye" &&
+                    u.AktifMi)
+                .OrderBy(u =>
+                    u.AdSoyad)
+                .Select(u => new
+                {
+                    u.UyeId,
 
-                GorunenAd =
-                    "ID: " + u.UyeId +
-                    " - " + u.AdSoyad +
-                    " (" + u.Eposta + ")"
-            })
-            .ToListAsync();
+                    GorunenAd =
+                        "ID: " + u.UyeId +
+                        " - " + u.AdSoyad +
+                        " (" + u.Eposta + ")"
+                })
+                .ToListAsync();
 
-        ViewData["KitapId"] = new SelectList(
-            kitaplar,
-            "KitapId",
-            "GorunenAd",
-            secilenKitapId);
+        ViewData["KitapId"] =
+            new SelectList(
+                kitaplar,
+                "KitapId",
+                "GorunenAd",
+                secilenKitapId);
 
-        ViewData["UyeId"] = new SelectList(
-            uyeler,
-            "UyeId",
-            "GorunenAd",
-            secilenUyeId);
+        ViewData["UyeId"] =
+            new SelectList(
+                uyeler,
+                "UyeId",
+                "GorunenAd",
+                secilenUyeId);
     }
 
+    // Giriş yapan üyenin ID bilgisini getirir.
     private int? GirisYapanUyeId()
     {
         string? uyeIdDegeri =
