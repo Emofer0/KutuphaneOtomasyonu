@@ -3,6 +3,7 @@ using KutuphaneOtomasyonu.Data;
 using KutuphaneOtomasyonu.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 
 namespace KutuphaneOtomasyonu.Controllers;
@@ -12,7 +13,8 @@ public class RezervasyonlarController : Controller
 {
     private readonly KutuphaneContext _context;
 
-    public RezervasyonlarController(KutuphaneContext context)
+    public RezervasyonlarController(
+        KutuphaneContext context)
     {
         _context = context;
     }
@@ -36,22 +38,164 @@ public class RezervasyonlarController : Controller
                 return Forbid();
             }
 
-            sorgu = sorgu.Where(r => r.UyeId == uyeId.Value);
+            sorgu = sorgu.Where(r =>
+                r.UyeId == uyeId.Value);
         }
 
         var rezervasyonlar = await sorgu
-            .OrderBy(r => r.Durum == "Bekliyor" ? 0 : 1)
-            .ThenByDescending(r => r.RezervasyonTarihi)
+            .OrderBy(r =>
+                r.Durum == "Bekliyor" ? 0 : 1)
+            .ThenByDescending(r =>
+                r.RezervasyonTarihi)
             .ToListAsync();
 
         return View(rezervasyonlar);
     }
 
-    // Üyenin kitap ayırtması
+    // Admin rezervasyon oluşturma sayfası
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Create()
+    {
+        await FormListeleriniHazirla();
+
+        return View();
+    }
+
+    // Admin seçilen üye adına rezervasyon oluşturur.
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> Create(
+        int kitapId,
+        int uyeId)
+    {
+        var uye = await _context.Uyelers
+            .FirstOrDefaultAsync(u =>
+                u.UyeId == uyeId);
+
+        if (uye == null)
+        {
+            TempData["Hata"] =
+                "Seçilen üye bulunamadı.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
+        if (uye.Rol == "Admin")
+        {
+            TempData["Hata"] =
+                "Admin hesabı adına rezervasyon oluşturulamaz.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
+        if (!uye.AktifMi)
+        {
+            TempData["Hata"] =
+                "Pasif üyeler adına rezervasyon oluşturulamaz.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
+        var kitap = await _context.Kitaplars
+            .FirstOrDefaultAsync(k =>
+                k.KitapId == kitapId);
+
+        if (kitap == null)
+        {
+            TempData["Hata"] =
+                "Seçilen kitap bulunamadı.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
+        if (kitap.MevcutAdet > 0)
+        {
+            TempData["Hata"] =
+                "Bu kitap şu anda mevcut olduğu için rezervasyon oluşturulamaz.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
+        bool bekleyenRezervasyonVar =
+            await _context.Rezervasyonlars
+                .AnyAsync(r =>
+                    r.KitapId == kitapId &&
+                    r.UyeId == uyeId &&
+                    r.Durum == "Bekliyor");
+
+        if (bekleyenRezervasyonVar)
+        {
+            TempData["Hata"] =
+                "Bu üyenin seçilen kitap için zaten bekleyen bir rezervasyonu var.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
+        var rezervasyon = new Rezervasyonlar
+        {
+            KitapId = kitapId,
+            UyeId = uyeId,
+            RezervasyonTarihi = DateTime.Now,
+            Durum = "Bekliyor"
+        };
+
+        _context.Rezervasyonlars.Add(
+            rezervasyon);
+
+        try
+        {
+            await _context.SaveChangesAsync();
+
+            TempData["Basarili"] =
+                "Rezervasyon başarıyla oluşturuldu.";
+
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DbUpdateException)
+        {
+            TempData["Hata"] =
+                "Rezervasyon kaydedilemedi. Aynı üye ve kitap için bekleyen bir rezervasyon olabilir.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+    }
+
+    // Üyenin kitap detayından rezervasyon oluşturması
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Roles = "Uye")]
-    public async Task<IActionResult> Ayirt(int kitapId)
+    public async Task<IActionResult> Ayirt(
+        int kitapId)
     {
         int? uyeId = GirisYapanUyeId();
 
@@ -60,8 +204,24 @@ public class RezervasyonlarController : Controller
             return Forbid();
         }
 
+        var uye = await _context.Uyelers
+            .FirstOrDefaultAsync(u =>
+                u.UyeId == uyeId.Value);
+
+        if (uye == null || !uye.AktifMi)
+        {
+            TempData["Hata"] =
+                "Pasif üyeler rezervasyon oluşturamaz.";
+
+            return RedirectToAction(
+                "Details",
+                "Kitaplar",
+                new { id = kitapId });
+        }
+
         var kitap = await _context.Kitaplars
-            .FirstOrDefaultAsync(k => k.KitapId == kitapId);
+            .FirstOrDefaultAsync(k =>
+                k.KitapId == kitapId);
 
         if (kitap == null)
         {
@@ -76,14 +236,15 @@ public class RezervasyonlarController : Controller
             return RedirectToAction(
                 "Details",
                 "Kitaplar",
-                new { id = kitapId }
-            );
+                new { id = kitapId });
         }
 
-        bool aktifRezervasyonVar = await _context.Rezervasyonlars.AnyAsync(r =>
-            r.KitapId == kitapId &&
-            r.UyeId == uyeId.Value &&
-            r.Durum == "Bekliyor");
+        bool aktifRezervasyonVar =
+            await _context.Rezervasyonlars
+                .AnyAsync(r =>
+                    r.KitapId == kitapId &&
+                    r.UyeId == uyeId.Value &&
+                    r.Durum == "Bekliyor");
 
         if (aktifRezervasyonVar)
         {
@@ -93,8 +254,7 @@ public class RezervasyonlarController : Controller
             return RedirectToAction(
                 "Details",
                 "Kitaplar",
-                new { id = kitapId }
-            );
+                new { id = kitapId });
         }
 
         var rezervasyon = new Rezervasyonlar
@@ -105,12 +265,15 @@ public class RezervasyonlarController : Controller
             Durum = "Bekliyor"
         };
 
-        _context.Rezervasyonlars.Add(rezervasyon);
+        _context.Rezervasyonlars.Add(
+            rezervasyon);
 
         try
         {
             await _context.SaveChangesAsync();
-            TempData["Basarili"] = "Kitap başarıyla ayırtıldı.";
+
+            TempData["Basarili"] =
+                "Kitap başarıyla ayırtıldı.";
         }
         catch (DbUpdateException)
         {
@@ -121,13 +284,16 @@ public class RezervasyonlarController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // Üye kendi rezervasyonunu, admin istediği rezervasyonu iptal edebilir.
+    // Üye kendi rezervasyonunu,
+    // admin istediği rezervasyonu iptal edebilir.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Iptal(int id)
     {
-        var rezervasyon = await _context.Rezervasyonlars
-            .FirstOrDefaultAsync(r => r.RezervasyonId == id);
+        var rezervasyon =
+            await _context.Rezervasyonlars
+                .FirstOrDefaultAsync(r =>
+                    r.RezervasyonId == id);
 
         if (rezervasyon == null)
         {
@@ -138,7 +304,8 @@ public class RezervasyonlarController : Controller
         {
             int? uyeId = GirisYapanUyeId();
 
-            if (uyeId == null || rezervasyon.UyeId != uyeId.Value)
+            if (uyeId == null ||
+                rezervasyon.UyeId != uyeId.Value)
             {
                 return Forbid();
             }
@@ -153,21 +320,25 @@ public class RezervasyonlarController : Controller
         }
 
         rezervasyon.Durum = "İptal";
+
         await _context.SaveChangesAsync();
 
-        TempData["Basarili"] = "Rezervasyon iptal edildi.";
+        TempData["Basarili"] =
+            "Rezervasyon iptal edildi.";
 
         return RedirectToAction(nameof(Index));
     }
 
-    // Rezervasyonu tamamlandı olarak işaretleme yalnızca admine açıktır.
+    // Rezervasyonu tamamlamak yalnızca admine açıktır.
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Tamamla(int id)
     {
-        var rezervasyon = await _context.Rezervasyonlars
-            .FirstOrDefaultAsync(r => r.RezervasyonId == id);
+        var rezervasyon =
+            await _context.Rezervasyonlars
+                .FirstOrDefaultAsync(r =>
+                    r.RezervasyonId == id);
 
         if (rezervasyon == null)
         {
@@ -183,6 +354,7 @@ public class RezervasyonlarController : Controller
         }
 
         rezervasyon.Durum = "Tamamlandı";
+
         await _context.SaveChangesAsync();
 
         TempData["Basarili"] =
@@ -191,12 +363,62 @@ public class RezervasyonlarController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    // Admin rezervasyon formundaki listeleri hazırlar.
+    private async Task FormListeleriniHazirla(
+        int? secilenKitapId = null,
+        int? secilenUyeId = null)
+    {
+        var kitaplar = await _context.Kitaplars
+            .Where(k => k.MevcutAdet <= 0)
+            .OrderBy(k => k.Baslik)
+            .Select(k => new
+            {
+                k.KitapId,
+
+                GorunenAd =
+                    "ID: " + k.KitapId +
+                    " - " + k.Baslik
+            })
+            .ToListAsync();
+
+        var uyeler = await _context.Uyelers
+            .Where(u =>
+                u.Rol == "Uye" &&
+                u.AktifMi)
+            .OrderBy(u => u.AdSoyad)
+            .Select(u => new
+            {
+                u.UyeId,
+
+                GorunenAd =
+                    "ID: " + u.UyeId +
+                    " - " + u.AdSoyad +
+                    " (" + u.Eposta + ")"
+            })
+            .ToListAsync();
+
+        ViewData["KitapId"] = new SelectList(
+            kitaplar,
+            "KitapId",
+            "GorunenAd",
+            secilenKitapId);
+
+        ViewData["UyeId"] = new SelectList(
+            uyeler,
+            "UyeId",
+            "GorunenAd",
+            secilenUyeId);
+    }
+
     private int? GirisYapanUyeId()
     {
         string? uyeIdDegeri =
-            User.FindFirstValue(ClaimTypes.NameIdentifier);
+            User.FindFirstValue(
+                ClaimTypes.NameIdentifier);
 
-        if (int.TryParse(uyeIdDegeri, out int uyeId))
+        if (int.TryParse(
+            uyeIdDegeri,
+            out int uyeId))
         {
             return uyeId;
         }

@@ -27,11 +27,23 @@
             </p>
         </div>
 
-        <a asp-controller="Kitaplar"
-           asp-action="Index"
-           class="btn btn-outline-primary">
-            Kitaplara Dön
+        <div class="d-flex gap-2">
+
+    @if (User.IsInRole("Admin"))
+    {
+        <a asp-action="Create"
+           class="btn btn-primary">
+            Yeni Rezervasyon
         </a>
+    }
+
+    <a asp-controller="Kitaplar"
+       asp-action="Index"
+       class="btn btn-outline-primary">
+        Kitaplara Dön
+    </a>
+
+</div>
     </div>
 
     @if (TempData["Basarili"] != null)

@@ -28,7 +28,8 @@ public class UyelerController : Controller
             sorgu = sorgu.Where(u =>
                 u.AdSoyad.Contains(arama) ||
                 u.Eposta.Contains(arama) ||
-                (u.Telefon != null && u.Telefon.Contains(arama)));
+                (u.Telefon != null &&
+                 u.Telefon.Contains(arama)));
         }
 
         var uyeler = await sorgu
@@ -39,7 +40,7 @@ public class UyelerController : Controller
         return View(uyeler);
     }
 
-    // Üye detayı
+    // Üye detay sayfası
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null)
@@ -61,25 +62,26 @@ public class UyelerController : Controller
     }
 
     // Yeni üye formu
+    [HttpGet]
     public IActionResult Create()
     {
         return View();
     }
 
-    // Yeni üye kaydetme
+    // Yeni üyeyi kaydetme
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(Uyeler uye)
     {
-        bool epostaKullaniliyor = await _context.Uyelers
-            .AnyAsync(u => u.Eposta == uye.Eposta);
+        bool epostaKullaniliyor =
+            await _context.Uyelers.AnyAsync(u =>
+                u.Eposta == uye.Eposta);
 
         if (epostaKullaniliyor)
         {
             ModelState.AddModelError(
                 nameof(uye.Eposta),
-                "Bu e-posta adresi başka bir hesap tarafından kullanılıyor."
-            );
+                "Bu e-posta adresi başka bir hesap tarafından kullanılıyor.");
         }
 
         if (!ModelState.IsValid)
@@ -98,12 +100,14 @@ public class UyelerController : Controller
         _context.Uyelers.Add(uye);
         await _context.SaveChangesAsync();
 
-        TempData["Basarili"] = "Yeni üye başarıyla oluşturuldu.";
+        TempData["Basarili"] =
+            "Yeni üye başarıyla oluşturuldu.";
 
         return RedirectToAction(nameof(Index));
     }
 
     // Üye düzenleme formu
+    [HttpGet]
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null)
@@ -124,15 +128,17 @@ public class UyelerController : Controller
     // Üye bilgilerini güncelleme
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Edit(int id, Uyeler uye)
+    public async Task<IActionResult> Edit(
+        int id,
+        Uyeler uye)
     {
         if (id != uye.UyeId)
         {
             return NotFound();
         }
 
-        bool epostaKullaniliyor = await _context.Uyelers
-            .AnyAsync(u =>
+        bool epostaKullaniliyor =
+            await _context.Uyelers.AnyAsync(u =>
                 u.Eposta == uye.Eposta &&
                 u.UyeId != uye.UyeId);
 
@@ -140,8 +146,7 @@ public class UyelerController : Controller
         {
             ModelState.AddModelError(
                 nameof(uye.Eposta),
-                "Bu e-posta adresi başka bir hesap tarafından kullanılıyor."
-            );
+                "Bu e-posta adresi başka bir hesap tarafından kullanılıyor.");
         }
 
         if (!ModelState.IsValid)
@@ -161,10 +166,10 @@ public class UyelerController : Controller
         mevcutUye.Eposta = uye.Eposta;
         mevcutUye.Telefon = uye.Telefon;
 
-        // Rol ve kayıt tarihi mevcut hâliyle korunur.
         await _context.SaveChangesAsync();
 
-        TempData["Basarili"] = "Üye bilgileri güncellendi.";
+        TempData["Basarili"] =
+            "Üye bilgileri başarıyla güncellendi.";
 
         return RedirectToAction(nameof(Index));
     }
@@ -185,19 +190,53 @@ public class UyelerController : Controller
 
         if (uye.Rol == "Admin")
         {
-            TempData["Hata"] = "Admin hesabı pasife alınamaz.";
+            TempData["Hata"] =
+                "Admin hesabı pasife alınamaz.";
+
             return RedirectToAction(nameof(Index));
         }
 
         if (!uye.AktifMi)
         {
-            TempData["Hata"] = "Bu üye zaten pasif durumda.";
+            TempData["Hata"] =
+                "Bu üye zaten pasif durumda.";
+
             return RedirectToAction(nameof(Index));
         }
 
+        // Üyenin teslim etmediği kitapları getirir.
+        var teslimEdilmemisIslemler =
+            await _context.OduncIslemleris
+                .Where(o =>
+                    o.UyeId == id &&
+                    !o.TeslimEdildiMi)
+                .ToListAsync();
+
+        // Teslim edilmemiş kitap varsa pasife alınamaz.
+        if (teslimEdilmemisIslemler.Any())
+        {
+            bool gecikenKitapVar =
+                teslimEdilmemisIslemler.Any(o =>
+                    o.SonTeslimTarihi < DateTime.Now);
+
+            if (gecikenKitapVar)
+            {
+                TempData["Hata"] =
+                    "Bu üyenin gecikmiş ve henüz teslim edilmemiş kitabı bulunmaktadır. Kitap iade edilmeden üye pasife alınamaz.";
+            }
+            else
+            {
+                TempData["Hata"] =
+                    "Bu üyenin henüz teslim etmediği kitabı bulunmaktadır. Kitap iade edilmeden üye pasife alınamaz.";
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        // Teslim edilmemiş kitabı yoksa pasife alınır.
         uye.AktifMi = false;
 
-        // Üyenin bekleyen rezervasyonlarını iptal eder.
+        // Bekleyen rezervasyonları bulur.
         var bekleyenRezervasyonlar =
             await _context.Rezervasyonlars
                 .Where(r =>
@@ -205,6 +244,7 @@ public class UyelerController : Controller
                     r.Durum == "Bekliyor")
                 .ToListAsync();
 
+        // Bekleyen rezervasyonları iptal eder.
         foreach (var rezervasyon in bekleyenRezervasyonlar)
         {
             rezervasyon.Durum = "İptal";
@@ -212,8 +252,17 @@ public class UyelerController : Controller
 
         await _context.SaveChangesAsync();
 
-        TempData["Basarili"] =
-            "Üye pasife alındı. Bekleyen rezervasyonları iptal edildi.";
+        if (bekleyenRezervasyonlar.Any())
+        {
+            TempData["Basarili"] =
+                $"Üye pasife alındı. Üyeye ait " +
+                $"{bekleyenRezervasyonlar.Count} bekleyen rezervasyon iptal edildi.";
+        }
+        else
+        {
+            TempData["Basarili"] =
+                "Üye başarıyla pasife alındı.";
+        }
 
         return RedirectToAction(nameof(Index));
     }
@@ -234,7 +283,9 @@ public class UyelerController : Controller
 
         if (uye.AktifMi)
         {
-            TempData["Hata"] = "Bu üye zaten aktif durumda.";
+            TempData["Hata"] =
+                "Bu üye zaten aktif durumda.";
+
             return RedirectToAction(nameof(Index));
         }
 
@@ -242,13 +293,9 @@ public class UyelerController : Controller
 
         await _context.SaveChangesAsync();
 
-        TempData["Basarili"] = "Üye yeniden aktif edildi.";
+        TempData["Basarili"] =
+            "Üye yeniden aktif edildi.";
 
         return RedirectToAction(nameof(Index));
-    }
-
-    private bool UyeVarMi(int id)
-    {
-        return _context.Uyelers.Any(u => u.UyeId == id);
     }
 }
