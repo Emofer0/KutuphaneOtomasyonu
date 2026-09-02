@@ -18,7 +18,7 @@ public class OduncIslemleriController : Controller
         _context = context;
     }
 
-    // Listeleme, arama ve filtreleme
+    // Ödünç işlemlerini listeler, arar ve filtreler.
     public async Task<IActionResult> Index(
         string? durum,
         string? arama)
@@ -70,7 +70,7 @@ public class OduncIslemleriController : Controller
         return View(sonuc);
     }
 
-    // Ödünç işlemi detayı
+    // Ödünç işlemi detay sayfası
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null)
@@ -148,11 +148,12 @@ public class OduncIslemleriController : Controller
                 "Pasif üyeye kitap ödünç verilemez.");
         }
 
-        bool ayniKitapUyede = await _context.OduncIslemleris
-            .AnyAsync(o =>
-                o.KitapId == KitapId &&
-                o.UyeId == UyeId &&
-                !o.TeslimEdildiMi);
+        bool ayniKitapUyede =
+            await _context.OduncIslemleris
+                .AnyAsync(o =>
+                    o.KitapId == KitapId &&
+                    o.UyeId == UyeId &&
+                    !o.TeslimEdildiMi);
 
         if (ayniKitapUyede)
         {
@@ -280,8 +281,7 @@ public class OduncIslemleriController : Controller
             return NotFound();
         }
 
-        // Ödünçte ve geciken kayıtların
-        // silme sayfasını açmasını engeller.
+        // Ödünçte veya geciken kitap silinemez.
         if (!islem.TeslimEdildiMi)
         {
             bool geciktiMi =
@@ -295,10 +295,24 @@ public class OduncIslemleriController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        // Gecikmeli iade edilen kayıt silinemez.
+        bool gecikmeliIadeEdildi =
+            islem.IadeTarihi.HasValue &&
+            islem.IadeTarihi.Value.Date >
+            islem.SonTeslimTarihi.Date;
+
+        if (gecikmeliIadeEdildi)
+        {
+            TempData["HataMesaji"] =
+                "Gecikmeli iade edilen ödünç işlemleri silinemez.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
         return View(islem);
     }
 
-    // Yalnızca iade edilmiş işlemi siler
+    // Yalnızca zamanında iade edilmiş işlemi siler.
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(
@@ -316,8 +330,7 @@ public class OduncIslemleriController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        // URL veya farklı bir istek üzerinden
-        // aktif kaydı silmeyi de engeller.
+        // Ödünçte veya geciken kitap silinemez.
         if (!islem.TeslimEdildiMi)
         {
             bool geciktiMi =
@@ -331,24 +344,40 @@ public class OduncIslemleriController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        // Gecikmeli iade edilen kayıt silinemez.
+        bool gecikmeliIadeEdildi =
+            islem.IadeTarihi.HasValue &&
+            islem.IadeTarihi.Value.Date >
+            islem.SonTeslimTarihi.Date;
+
+        if (gecikmeliIadeEdildi)
+        {
+            TempData["HataMesaji"] =
+                "Gecikmeli iade edilen ödünç işlemleri silinemez.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
         _context.OduncIslemleris.Remove(islem);
 
         await _context.SaveChangesAsync();
 
         TempData["BasariliMesaj"] =
-            "İade edilmiş ödünç işlemi silindi.";
+            "Ödünç işlemi başarıyla silindi.";
 
         return RedirectToAction(nameof(Index));
     }
 
-    // Kitap ve üye listelerini hazırlar
+    // Kitap ve üye seçim listelerini hazırlar
     private void FormListeleriniHazirla(
         int? secilenKitapId = null,
         int? secilenUyeId = null)
     {
         var kitaplar = _context.Kitaplars
-            .Where(k => k.MevcutAdet > 0)
-            .OrderBy(k => k.Baslik)
+            .Where(k =>
+                k.MevcutAdet > 0)
+            .OrderBy(k =>
+                k.Baslik)
             .Select(k => new
             {
                 k.KitapId,
@@ -365,7 +394,8 @@ public class OduncIslemleriController : Controller
             .Where(u =>
                 u.Rol == "Uye" &&
                 u.AktifMi)
-            .OrderBy(u => u.AdSoyad)
+            .OrderBy(u =>
+                u.AdSoyad)
             .Select(u => new
             {
                 u.UyeId,

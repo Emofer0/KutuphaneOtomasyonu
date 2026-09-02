@@ -141,16 +141,30 @@ else
                         item.SonTeslimTarihi.Date <
                         DateTime.Today;
 
+                    bool gecikmeliIadeEdildi =
+                        item.TeslimEdildiMi &&
+                        item.IadeTarihi.HasValue &&
+                        item.IadeTarihi.Value.Date >
+                        item.SonTeslimTarihi.Date;
+
                     int gecikmeGunSayisi = geciktiMi
                         ? (DateTime.Today -
                            item.SonTeslimTarihi.Date).Days
                         : 0;
 
+                    int gecikmeliIadeGunSayisi =
+                        gecikmeliIadeEdildi
+                            ? (item.IadeTarihi!.Value.Date -
+                               item.SonTeslimTarihi.Date).Days
+                            : 0;
+
                     decimal guncelCeza = geciktiMi
                         ? gecikmeGunSayisi * 5
                         : item.CezaTutari;
 
-                    <tr class="@(geciktiMi ? "table-danger" : "")">
+                    <tr class="@(geciktiMi || gecikmeliIadeEdildi
+                        ? "table-danger"
+                        : "")">
 
                         <td>
                             <a asp-controller="Kitaplar"
@@ -179,7 +193,7 @@ else
                         <td>
                             @if (item.IadeTarihi.HasValue)
                             {
-                                @item.IadeTarihi.Value.ToString("dd.MM.yyyy")
+                                                              @item.IadeTarihi.Value.ToString("dd.MM.yyyy")
                             }
                             else
                             {
@@ -200,10 +214,16 @@ else
                         </td>
 
                         <td>
-                            @if (item.TeslimEdildiMi)
+                            @if (gecikmeliIadeEdildi)
+                            {
+                                <span class="badge bg-danger">
+                                    @gecikmeliIadeGunSayisi gün gecikmeli iade
+                                </span>
+                            }
+                            else if (item.TeslimEdildiMi)
                             {
                                 <span class="badge bg-success">
-                                    İade Edildi
+                                    Zamanında İade Edildi
                                 </span>
                             }
                             else if (geciktiMi)
@@ -244,13 +264,20 @@ else
                                     Detay
                                 </a>
 
-                                @if (item.TeslimEdildiMi)
+                                @if (item.TeslimEdildiMi &&
+                                     !gecikmeliIadeEdildi)
                                 {
                                     <a asp-action="Delete"
                                        asp-route-id="@item.OduncId"
                                        class="btn btn-danger btn-sm">
                                         Sil
                                     </a>
+                                }
+                                else if (gecikmeliIadeEdildi)
+                                {
+                                    <span class="badge bg-secondary align-self-center">
+                                        Kayıt korunuyor
+                                    </span>
                                 }
 
                             </div>
