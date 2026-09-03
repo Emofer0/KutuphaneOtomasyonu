@@ -3,147 +3,323 @@
 @{
     ViewData["Title"] = "Ödünç İşlemi Detayı";
 
-    var geciktiMi =
+    bool geciktiMi =
         !Model.TeslimEdildiMi &&
-        Model.SonTeslimTarihi.Date < DateTime.Today;
+        Model.SonTeslimTarihi.Date <
+        DateTime.Today;
 
-    var gecikmeGunSayisi = geciktiMi
+    bool gecikmeliIadeEdildi =
+        Model.TeslimEdildiMi &&
+        Model.IadeTarihi.HasValue &&
+        Model.IadeTarihi.Value.Date >
+        Model.SonTeslimTarihi.Date;
+
+    int gecikmeGunSayisi = geciktiMi
         ? (DateTime.Today -
            Model.SonTeslimTarihi.Date).Days
         : 0;
 
-    var guncelCeza = geciktiMi
+    int gecikmeliIadeGunSayisi =
+        gecikmeliIadeEdildi
+            ? (Model.IadeTarihi!.Value.Date -
+               Model.SonTeslimTarihi.Date).Days
+            : 0;
+
+    decimal guncelCeza = geciktiMi
         ? gecikmeGunSayisi * 5
         : Model.CezaTutari;
 }
 
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1>Ödünç İşlemi Detayı</h1>
-        <p class="text-muted mb-0">
-            İşlem numarası: @Model.OduncId
-        </p>
-    </div>
+<div class="container py-4">
 
-    @if (Model.TeslimEdildiMi)
+    @if (TempData["BasariliMesaj"] != null)
     {
-        <span class="badge bg-success fs-5">
-            İade Edildi
-        </span>
-    }
-    else if (geciktiMi)
-    {
-        <span class="badge bg-danger fs-5">
-            @gecikmeGunSayisi gün gecikti
-        </span>
-    }
-    else
-    {
-        <span class="badge bg-warning text-dark fs-5">
-            Ödünçte
-        </span>
-    }
-</div>
+        <div class="alert alert-success alert-dismissible fade show">
+            @TempData["BasariliMesaj"]
 
-@if (geciktiMi)
-{
-    <div class="alert alert-danger">
-        Bu kitabın teslim tarihi geçmiştir.
-        Güncel tahmini ceza:
-        <strong>@guncelCeza.ToString("N2") TL</strong>
-    </div>
-}
-
-<div class="card">
-    <div class="card-body">
-        <dl class="row mb-0">
-            <dt class="col-sm-3">Kitap</dt>
-            <dd class="col-sm-9">
-                <a asp-controller="Kitaplar"
-                   asp-action="Details"
-                   asp-route-id="@Model.KitapId">
-                    @Model.Kitap?.Baslik
-                </a>
-            </dd>
-
-            <dt class="col-sm-3">Üye</dt>
-            <dd class="col-sm-9">
-                <a asp-controller="Uyeler"
-                   asp-action="Details"
-                   asp-route-id="@Model.UyeId">
-                    @Model.Uye?.AdSoyad
-                </a>
-            </dd>
-
-            <dt class="col-sm-3">Veriliş Tarihi</dt>
-            <dd class="col-sm-9">
-                @Model.VerilisTarihi.ToString("dd.MM.yyyy HH:mm")
-            </dd>
-
-            <dt class="col-sm-3">Son Teslim Tarihi</dt>
-            <dd class="col-sm-9">
-                @Model.SonTeslimTarihi.ToString("dd.MM.yyyy")
-            </dd>
-
-            <dt class="col-sm-3">İade Tarihi</dt>
-            <dd class="col-sm-9">
-                @(Model.IadeTarihi?.ToString("dd.MM.yyyy HH:mm") ?? "-")
-            </dd>
-
-            <dt class="col-sm-3">Ceza Tutarı</dt>
-            <dd class="col-sm-9">
-                @guncelCeza.ToString("N2") TL
-
-                @if (geciktiMi)
-                {
-                    <span class="text-danger">
-                        (tahmini)
-                    </span>
-                }
-            </dd>
-
-            <dt class="col-sm-3">Durum</dt>
-            <dd class="col-sm-9">
-                @if (Model.TeslimEdildiMi)
-                {
-                    <span class="badge bg-success">
-                        İade Edildi
-                    </span>
-                }
-                else if (geciktiMi)
-                {
-                    <span class="badge bg-danger">
-                        Gecikti
-                    </span>
-                }
-                else
-                {
-                    <span class="badge bg-warning text-dark">
-                        Ödünçte
-                    </span>
-                }
-            </dd>
-        </dl>
-    </div>
-</div>
-
-<div class="mt-4">
-    @if (!Model.TeslimEdildiMi)
-    {
-        <form asp-action="IadeEt"
-              asp-route-id="@Model.OduncId"
-              method="post"
-              class="d-inline">
-
-            <button type="submit"
-                    class="btn btn-success"
-                    onclick="return confirm('Kitap iade edilsin mi?')">
-                Kitabı İade Et
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
             </button>
-        </form>
+        </div>
     }
 
-    <a asp-action="Index" class="btn btn-secondary">
-        Listeye Dön
-    </a>
+    @if (TempData["HataMesaji"] != null)
+    {
+        <div class="alert alert-danger alert-dismissible fade show">
+            @TempData["HataMesaji"]
+
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
+            </button>
+        </div>
+    }
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="mb-1">
+                Ödünç İşlemi Detayı
+            </h1>
+
+            <p class="text-muted mb-0">
+                İşlem numarası: #@Model.OduncId
+            </p>
+        </div>
+
+        @if (gecikmeliIadeEdildi)
+        {
+            <span class="badge bg-danger fs-5">
+                @gecikmeliIadeGunSayisi gün gecikmeli iade
+            </span>
+        }
+        else if (Model.TeslimEdildiMi)
+        {
+            <span class="badge bg-success fs-5">
+                Zamanında İade Edildi
+            </span>
+        }
+        else if (geciktiMi)
+        {
+            <span class="badge bg-danger fs-5">
+                @gecikmeGunSayisi gün gecikti
+            </span>
+        }
+        else
+        {
+            <span class="badge bg-warning text-dark fs-5">
+                Ödünçte
+            </span>
+        }
+    </div>
+
+    @if (geciktiMi)
+    {
+        <div class="alert alert-danger">
+            Bu kitabın teslim tarihi geçmiştir.
+            Güncel tahmini ceza:
+
+            <strong>
+                @guncelCeza.ToString("N2") TL
+            </strong>
+        </div>
+    }
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+
+            <dl class="row mb-0">
+
+                <dt class="col-sm-3">
+                    Kitap
+                </dt>
+
+                <dd class="col-sm-9">
+                    <a asp-controller="Kitaplar"
+                       asp-action="Details"
+                       asp-route-id="@Model.KitapId">
+
+                        @(Model.Kitap?.Baslik ?? "-")
+                    </a>
+                </dd>
+
+                <dt class="col-sm-3">
+                    Fiziksel Kopya
+                </dt>
+
+                <dd class="col-sm-9">
+                    @if (Model.Kopya != null)
+                    {
+                        <span>
+                            Kopya #@Model.Kopya.KopyaId
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">
+                            Eski kayıt – fiziksel kopya bilgisi yok
+                        </span>
+                    }
+                </dd>
+
+                <dt class="col-sm-3">
+                    Barkod
+                </dt>
+
+                <dd class="col-sm-9">
+                    @if (Model.Kopya != null)
+                    {
+                        <span class="badge bg-dark fs-6">
+                            @Model.Kopya.Barkod
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="text-muted">
+                            Eski kayıt – barkod bilgisi yok
+                        </span>
+                    }
+                </dd>
+
+                <dt class="col-sm-3">
+                    Kopya Durumu
+                </dt>
+
+                <dd class="col-sm-9">
+                    @if (Model.Kopya == null)
+                    {
+                        <span class="text-muted">
+                            -
+                        </span>
+                    }
+                    else if (Model.Kopya.Durum == "Rafta")
+                    {
+                        <span class="badge bg-success">
+                            Rafta
+                        </span>
+                    }
+                    else if (Model.Kopya.Durum == "Ödünçte")
+                    {
+                        <span class="badge bg-warning text-dark">
+                            Ödünçte
+                        </span>
+                    }
+                    else if (Model.Kopya.Durum == "Kayıp")
+                    {
+                        <span class="badge bg-danger">
+                            Kayıp
+                        </span>
+                    }
+                    else if (Model.Kopya.Durum == "Hasarlı")
+                    {
+                        <span class="badge bg-danger">
+                            Hasarlı
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-secondary">
+                            @Model.Kopya.Durum
+                        </span>
+                    }
+                </dd>
+
+                <dt class="col-sm-3">
+                    Üye
+                </dt>
+
+                <dd class="col-sm-9">
+                    <a asp-controller="Uyeler"
+                       asp-action="Details"
+                       asp-route-id="@Model.UyeId">
+
+                        @(Model.Uye?.AdSoyad ?? "-")
+                    </a>
+                </dd>
+
+                <dt class="col-sm-3">
+                    Üye ID
+                </dt>
+
+                <dd class="col-sm-9">
+                    #@Model.UyeId
+                </dd>
+
+                <dt class="col-sm-3">
+                    Veriliş Tarihi
+                </dt>
+
+                <dd class="col-sm-9">
+                    @Model.VerilisTarihi.ToString("dd.MM.yyyy HH:mm")
+                </dd>
+
+                <dt class="col-sm-3">
+                    Son Teslim Tarihi
+                </dt>
+
+                <dd class="col-sm-9">
+                    @Model.SonTeslimTarihi.ToString("dd.MM.yyyy")
+                </dd>
+
+                <dt class="col-sm-3">
+                    İade Tarihi
+                </dt>
+
+                <dd class="col-sm-9">
+                    @(Model.IadeTarihi?.ToString("dd.MM.yyyy HH:mm") ?? "-")
+                </dd>
+
+                <dt class="col-sm-3">
+                    Ceza Tutarı
+                </dt>
+
+                <dd class="col-sm-9">
+                    @guncelCeza.ToString("N2") TL
+
+                    @if (geciktiMi)
+                    {
+                        <span class="text-danger">
+                            (tahmini)
+                        </span>
+                    }
+                </dd>
+
+                <dt class="col-sm-3">
+                    İşlem Durumu
+                </dt>
+
+                <dd class="col-sm-9">
+                    @if (gecikmeliIadeEdildi)
+                    {
+                        <span class="badge bg-danger">
+                            Gecikmeli İade Edildi
+                        </span>
+                    }
+                    else if (Model.TeslimEdildiMi)
+                    {
+                        <span class="badge bg-success">
+                            Zamanında İade Edildi
+                        </span>
+                    }
+                    else if (geciktiMi)
+                    {
+                        <span class="badge bg-danger">
+                            Gecikti
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="badge bg-warning text-dark">
+                            Ödünçte
+                        </span>
+                    }
+                </dd>
+
+            </dl>
+        </div>
+    </div>
+
+    <div class="mt-4">
+
+        @if (!Model.TeslimEdildiMi)
+        {
+            <form asp-action="IadeEt"
+                  asp-route-id="@Model.OduncId"
+                  method="post"
+                  class="d-inline">
+
+                <button type="submit"
+                        class="btn btn-success"
+                        onclick="return confirm('Kitap iade edilsin mi?')">
+                    Kitabı İade Et
+                </button>
+            </form>
+        }
+
+        <a asp-action="Index"
+           class="btn btn-secondary">
+            Listeye Dön
+        </a>
+
+    </div>
 </div>

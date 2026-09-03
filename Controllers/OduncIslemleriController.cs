@@ -18,7 +18,7 @@ public class OduncIslemleriController : Controller
         _context = context;
     }
 
-    // Ödünç işlemlerini listeler, arar ve filtreler.
+    // Ödünç işlemlerini listeler.
     public async Task<IActionResult> Index(
         string? durum,
         string? arama)
@@ -26,6 +26,7 @@ public class OduncIslemleriController : Controller
         var islemler = _context.OduncIslemleris
             .Include(o => o.Kitap)
             .Include(o => o.Uye)
+            .Include(o => o.Kopya)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(arama))
@@ -34,7 +35,9 @@ public class OduncIslemleriController : Controller
 
             islemler = islemler.Where(o =>
                 o.Kitap.Baslik.Contains(arama) ||
-                o.Uye.AdSoyad.Contains(arama));
+                o.Uye.AdSoyad.Contains(arama) ||
+                (o.Kopya != null &&
+                 o.Kopya.Barkod.Contains(arama)));
         }
 
         switch (durum)
@@ -70,7 +73,7 @@ public class OduncIslemleriController : Controller
         return View(sonuc);
     }
 
-    // Ödünç işlemi detay sayfası
+    // Ödünç işlemi detayı
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null)
@@ -81,6 +84,7 @@ public class OduncIslemleriController : Controller
         var islem = await _context.OduncIslemleris
             .Include(o => o.Kitap)
             .Include(o => o.Uye)
+            .Include(o => o.Kopya)
             .FirstOrDefaultAsync(o =>
                 o.OduncId == id.Value);
 
@@ -96,44 +100,75 @@ public class OduncIslemleriController : Controller
     [HttpGet]
     public IActionResult Create()
     {
-        FormListeleriniHazirla();
+        UyeListesiniHazirla();
 
         return View();
     }
 
-    // Kitabı üyeye ödünç verme
+    // Barkod okutularak kitabı üyeye verir.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(
-        int KitapId,
+        string? Barkod,
         int UyeId)
     {
-        var kitap = await _context.Kitaplars
-            .FirstOrDefaultAsync(k =>
-                k.KitapId == KitapId);
+        ViewBag.Barkod = Barkod;
+
+        if (string.IsNullOrWhiteSpace(Barkod))
+        {
+            ModelState.AddModelError(
+                "Barkod",
+                "Kitap barkodunu giriniz veya okutunuz.");
+        }
+
+        if (UyeId <= 0)
+        {
+            ModelState.AddModelError(
+                "UyeId",
+                "Geçerli bir üye seçiniz.");
+        }
+
+        KitapKopyalari? kopya = null;
+
+        if (!string.IsNullOrWhiteSpace(Barkod))
+        {
+            string temizBarkod =
+                Barkod.Trim().ToUpperInvariant();
+
+            kopya = await _context.KitapKopyalaris
+                .Include(k => k.Kitap)
+                .FirstOrDefaultAsync(k =>
+                    k.Barkod == temizBarkod);
+
+            if (kopya == null)
+            {
+                ModelState.AddModelError(
+                    "Barkod",
+                    "Bu barkoda ait fiziksel kitap kopyası bulunamadı.");
+            }
+            else if (!kopya.Kitap.AktifMi)
+            {
+                ModelState.AddModelError(
+                    "Barkod",
+                    "Bu kitap pasif durumda olduğu için ödünç verilemez.");
+            }
+            else if (kopya.Durum != "Rafta")
+            {
+                ModelState.AddModelError(
+                    "Barkod",
+                    $"Bu kopya ödünç verilemez. Güncel durumu: {kopya.Durum}.");
+            }
+        }
 
         var uye = await _context.Uyelers
             .FirstOrDefaultAsync(u =>
                 u.UyeId == UyeId);
 
-        if (kitap == null)
-        {
-            ModelState.AddModelError(
-                "KitapId",
-                "Geçerli bir kitap seçiniz.");
-        }
-        else if (kitap.MevcutAdet <= 0)
-        {
-            ModelState.AddModelError(
-                "KitapId",
-                "Bu kitabın mevcut stoğu bulunmamaktadır.");
-        }
-
         if (uye == null)
         {
             ModelState.AddModelError(
                 "UyeId",
-                "Geçerli bir üye seçiniz.");
+                "Seçilen üye bulunamadı.");
         }
         else if (uye.Rol != "Uye")
         {
@@ -148,29 +183,45 @@ public class OduncIslemleriController : Controller
                 "Pasif üyeye kitap ödünç verilemez.");
         }
 
-        bool ayniKitapUyede =
-            await _context.OduncIslemleris
-                .AnyAsync(o =>
-                    o.KitapId == KitapId &&
-                    o.UyeId == UyeId &&
-                    !o.TeslimEdildiMi);
-
-        if (ayniKitapUyede)
+        if (kopya != null && uye != null)
         {
-            ModelState.AddModelError(
-                "KitapId",
-                "Bu kitap zaten seçilen üyede ödünç olarak bulunuyor.");
+            bool ayniKitapUyede =
+                await _context.OduncIslemleris
+                    .AnyAsync(o =>
+                        o.KitapId == kopya.KitapId &&
+                        o.UyeId == UyeId &&
+                        !o.TeslimEdildiMi);
+
+            if (ayniKitapUyede)
+            {
+                ModelState.AddModelError(
+                    "Barkod",
+                    "Bu kitabın başka bir kopyası zaten seçilen üyede bulunuyor.");
+            }
         }
 
-        if (!ModelState.IsValid)
+        if (!ModelState.IsValid ||
+            kopya == null ||
+            uye == null)
         {
-            FormListeleriniHazirla(
-                KitapId,
-                UyeId);
+            UyeListesiniHazirla(UyeId);
 
             return View(new OduncIslemleri
             {
-                KitapId = KitapId,
+                UyeId = UyeId
+            });
+        }
+
+        if (kopya.Kitap.MevcutAdet <= 0)
+        {
+            ModelState.AddModelError(
+                "Barkod",
+                "Kitabın kullanılabilir stoğu bulunmuyor.");
+
+            UyeListesiniHazirla(UyeId);
+
+            return View(new OduncIslemleri
+            {
                 UyeId = UyeId
             });
         }
@@ -179,7 +230,8 @@ public class OduncIslemleriController : Controller
 
         var yeniIslem = new OduncIslemleri
         {
-            KitapId = KitapId,
+            KitapId = kopya.KitapId,
+            KopyaId = kopya.KopyaId,
             UyeId = UyeId,
             VerilisTarihi = verilisTarihi,
             SonTeslimTarihi =
@@ -189,26 +241,47 @@ public class OduncIslemleriController : Controller
             TeslimEdildiMi = false
         };
 
-        kitap!.MevcutAdet--;
+        // Fiziksel kopyayı ödünçte yapar.
+        kopya.Durum = "Ödünçte";
+
+        // Kitabın kullanılabilir sayısını azaltır.
+        kopya.Kitap.MevcutAdet--;
 
         _context.OduncIslemleris.Add(
             yeniIslem);
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            await _context.SaveChangesAsync();
 
-        TempData["BasariliMesaj"] =
-            "Kitap başarıyla ödünç verildi.";
+            TempData["BasariliMesaj"] =
+                $"{kopya.Barkod} barkodlu {kopya.Kitap.Baslik} kitabı üyeye verildi.";
 
-        return RedirectToAction(nameof(Index));
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DbUpdateException)
+        {
+            ModelState.AddModelError(
+                "",
+                "Ödünç işlemi kaydedilemedi. Bu kopya başka bir aktif işlemde kullanılıyor olabilir.");
+
+            UyeListesiniHazirla(UyeId);
+
+            return View(new OduncIslemleri
+            {
+                UyeId = UyeId
+            });
+        }
     }
 
-    // Kitabı iade alma
+    // Kitabı ve fiziksel kopyayı iade alır.
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> IadeEt(int id)
     {
         var islem = await _context.OduncIslemleris
             .Include(o => o.Kitap)
+            .Include(o => o.Kopya)
             .FirstOrDefaultAsync(o =>
                 o.OduncId == id);
 
@@ -248,7 +321,13 @@ public class OduncIslemleriController : Controller
             islem.CezaTutari = 0;
         }
 
-        if (islem.Kitap != null)
+        // Barkodlu fiziksel kopyayı yeniden rafa alır.
+        if (islem.Kopya != null)
+        {
+            islem.Kopya.Durum = "Rafta";
+        }
+
+        if (islem.Kitap.AktifMi)
         {
             islem.Kitap.MevcutAdet++;
         }
@@ -256,7 +335,9 @@ public class OduncIslemleriController : Controller
         await _context.SaveChangesAsync();
 
         TempData["BasariliMesaj"] =
-            "Kitap başarıyla iade edildi.";
+            islem.Kopya != null
+                ? $"{islem.Kopya.Barkod} barkodlu kitap başarıyla iade edildi."
+                : "Kitap başarıyla iade edildi.";
 
         return RedirectToAction(nameof(Index));
     }
@@ -273,6 +354,7 @@ public class OduncIslemleriController : Controller
         var islem = await _context.OduncIslemleris
             .Include(o => o.Kitap)
             .Include(o => o.Uye)
+            .Include(o => o.Kopya)
             .FirstOrDefaultAsync(o =>
                 o.OduncId == id.Value);
 
@@ -281,7 +363,6 @@ public class OduncIslemleriController : Controller
             return NotFound();
         }
 
-        // Ödünçte veya geciken kitap silinemez.
         if (!islem.TeslimEdildiMi)
         {
             bool geciktiMi =
@@ -289,19 +370,18 @@ public class OduncIslemleriController : Controller
                 DateTime.Today;
 
             TempData["HataMesaji"] = geciktiMi
-                ? "Geciken ödünç işlemi iade edilmeden silinemez."
-                : "Ödünçte olan işlem kitap iade edilmeden silinemez.";
+                ? "Geciken işlem iade edilmeden silinemez."
+                : "Ödünçteki işlem iade edilmeden silinemez.";
 
             return RedirectToAction(nameof(Index));
         }
 
-        // Gecikmeli iade edilen kayıt silinemez.
-        bool gecikmeliIadeEdildi =
+        bool gecikmeliIade =
             islem.IadeTarihi.HasValue &&
             islem.IadeTarihi.Value.Date >
             islem.SonTeslimTarihi.Date;
 
-        if (gecikmeliIadeEdildi)
+        if (gecikmeliIade)
         {
             TempData["HataMesaji"] =
                 "Gecikmeli iade edilen ödünç işlemleri silinemez.";
@@ -312,7 +392,7 @@ public class OduncIslemleriController : Controller
         return View(islem);
     }
 
-    // Yalnızca zamanında iade edilmiş işlemi siler.
+    // Yalnızca zamanında iade edilen işlemi siler.
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> DeleteConfirmed(
@@ -330,27 +410,20 @@ public class OduncIslemleriController : Controller
             return RedirectToAction(nameof(Index));
         }
 
-        // Ödünçte veya geciken kitap silinemez.
         if (!islem.TeslimEdildiMi)
         {
-            bool geciktiMi =
-                islem.SonTeslimTarihi.Date <
-                DateTime.Today;
-
-            TempData["HataMesaji"] = geciktiMi
-                ? "Geciken ödünç işlemi iade edilmeden silinemez."
-                : "Ödünçte olan işlem kitap iade edilmeden silinemez.";
+            TempData["HataMesaji"] =
+                "İade edilmemiş ödünç işlemi silinemez.";
 
             return RedirectToAction(nameof(Index));
         }
 
-        // Gecikmeli iade edilen kayıt silinemez.
-        bool gecikmeliIadeEdildi =
+        bool gecikmeliIade =
             islem.IadeTarihi.HasValue &&
             islem.IadeTarihi.Value.Date >
             islem.SonTeslimTarihi.Date;
 
-        if (gecikmeliIadeEdildi)
+        if (gecikmeliIade)
         {
             TempData["HataMesaji"] =
                 "Gecikmeli iade edilen ödünç işlemleri silinemez.";
@@ -359,7 +432,6 @@ public class OduncIslemleriController : Controller
         }
 
         _context.OduncIslemleris.Remove(islem);
-
         await _context.SaveChangesAsync();
 
         TempData["BasariliMesaj"] =
@@ -368,34 +440,15 @@ public class OduncIslemleriController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // Kitap ve üye seçim listelerini hazırlar
-    private void FormListeleriniHazirla(
-        int? secilenKitapId = null,
+    // Yalnızca aktif üyeleri listeler.
+    private void UyeListesiniHazirla(
         int? secilenUyeId = null)
     {
-        var kitaplar = _context.Kitaplars
-            .Where(k =>
-                k.MevcutAdet > 0)
-            .OrderBy(k =>
-                k.Baslik)
-            .Select(k => new
-            {
-                k.KitapId,
-
-                GorunenAd =
-                    "ID: " + k.KitapId +
-                    " - " + k.Baslik +
-                    " (Mevcut: " +
-                    k.MevcutAdet + ")"
-            })
-            .ToList();
-
         var uyeler = _context.Uyelers
             .Where(u =>
                 u.Rol == "Uye" &&
                 u.AktifMi)
-            .OrderBy(u =>
-                u.AdSoyad)
+            .OrderBy(u => u.AdSoyad)
             .Select(u => new
             {
                 u.UyeId,
@@ -406,13 +459,6 @@ public class OduncIslemleriController : Controller
                     " (" + u.Eposta + ")"
             })
             .ToList();
-
-        ViewData["KitapId"] =
-            new SelectList(
-                kitaplar,
-                "KitapId",
-                "GorunenAd",
-                secilenKitapId);
 
         ViewData["UyeId"] =
             new SelectList(

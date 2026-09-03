@@ -86,7 +86,7 @@ public class RezervasyonlarController : Controller
             return View();
         }
 
-        if (uye.Rol == "Admin")
+        if (uye.Rol != "Uye")
         {
             TempData["Hata"] =
                 "Admin hesabı adına rezervasyon oluşturulamaz.";
@@ -126,10 +126,22 @@ public class RezervasyonlarController : Controller
             return View();
         }
 
+        if (!kitap.AktifMi)
+        {
+            TempData["Hata"] =
+                "Pasif kitap için rezervasyon oluşturulamaz.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
         if (kitap.MevcutAdet > 0)
         {
             TempData["Hata"] =
-                "Bu kitap şu anda mevcut olduğu için rezervasyon oluşturulamaz.";
+                "Kitap rafta bulunduğu için rezervasyon oluşturulamaz.";
 
             await FormListeleriniHazirla(
                 kitapId,
@@ -148,7 +160,26 @@ public class RezervasyonlarController : Controller
         if (bekleyenRezervasyonVar)
         {
             TempData["Hata"] =
-                "Bu üyenin seçilen kitap için zaten bekleyen bir rezervasyonu var.";
+                "Bu üyenin kitap için zaten bekleyen rezervasyonu var.";
+
+            await FormListeleriniHazirla(
+                kitapId,
+                uyeId);
+
+            return View();
+        }
+
+        bool kitapZatenUyede =
+            await _context.OduncIslemleris
+                .AnyAsync(o =>
+                    o.KitapId == kitapId &&
+                    o.UyeId == uyeId &&
+                    !o.TeslimEdildiMi);
+
+        if (kitapZatenUyede)
+        {
+            TempData["Hata"] =
+                "Bu kitabın bir kopyası zaten ilgili üyede bulunuyor.";
 
             await FormListeleriniHazirla(
                 kitapId,
@@ -180,7 +211,7 @@ public class RezervasyonlarController : Controller
         catch (DbUpdateException)
         {
             TempData["Hata"] =
-                "Rezervasyon kaydedilemedi. Aynı üye ve kitap için bekleyen bir rezervasyon olabilir.";
+                "Rezervasyon kaydedilemedi. Aynı kitap için bekleyen rezervasyon olabilir.";
 
             await FormListeleriniHazirla(
                 kitapId,
@@ -190,7 +221,7 @@ public class RezervasyonlarController : Controller
         }
     }
 
-    // Üyenin kitap detayından rezervasyon oluşturması
+    // Üye kitap detayından rezervasyon oluşturur.
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Roles = "Uye")]
@@ -214,9 +245,8 @@ public class RezervasyonlarController : Controller
                 "Pasif üyeler rezervasyon oluşturamaz.";
 
             return RedirectToAction(
-                "Details",
-                "Kitaplar",
-                new { id = kitapId });
+                "Index",
+                "Kitaplar");
         }
 
         var kitap = await _context.Kitaplars
@@ -228,10 +258,20 @@ public class RezervasyonlarController : Controller
             return NotFound();
         }
 
+        if (!kitap.AktifMi)
+        {
+            TempData["Hata"] =
+                "Bu kitap pasif durumda olduğu için rezervasyon yapılamaz.";
+
+            return RedirectToAction(
+                "Index",
+                "Kitaplar");
+        }
+
         if (kitap.MevcutAdet > 0)
         {
             TempData["Hata"] =
-                "Bu kitap şu anda mevcut olduğu için rezervasyon yapılamaz.";
+                "Kitap rafta bulunduğu için rezervasyon yapılamaz.";
 
             return RedirectToAction(
                 "Details",
@@ -239,17 +279,35 @@ public class RezervasyonlarController : Controller
                 new { id = kitapId });
         }
 
-        bool aktifRezervasyonVar =
+        bool bekleyenRezervasyonVar =
             await _context.Rezervasyonlars
                 .AnyAsync(r =>
                     r.KitapId == kitapId &&
                     r.UyeId == uyeId.Value &&
                     r.Durum == "Bekliyor");
 
-        if (aktifRezervasyonVar)
+        if (bekleyenRezervasyonVar)
         {
             TempData["Hata"] =
                 "Bu kitap için zaten bekleyen bir rezervasyonunuz var.";
+
+            return RedirectToAction(
+                "Details",
+                "Kitaplar",
+                new { id = kitapId });
+        }
+
+        bool kitapZatenUyede =
+            await _context.OduncIslemleris
+                .AnyAsync(o =>
+                    o.KitapId == kitapId &&
+                    o.UyeId == uyeId.Value &&
+                    !o.TeslimEdildiMi);
+
+        if (kitapZatenUyede)
+        {
+            TempData["Hata"] =
+                "Bu kitabın başka bir kopyası zaten sizde bulunuyor.";
 
             return RedirectToAction(
                 "Details",
@@ -274,14 +332,19 @@ public class RezervasyonlarController : Controller
 
             TempData["Basarili"] =
                 "Kitap başarıyla ayırtıldı.";
+
+            return RedirectToAction(nameof(Index));
         }
         catch (DbUpdateException)
         {
             TempData["Hata"] =
                 "Rezervasyon kaydedilemedi veya bu kitap zaten ayırtılmış.";
-        }
 
-        return RedirectToAction(nameof(Index));
+            return RedirectToAction(
+                "Details",
+                "Kitaplar",
+                new { id = kitapId });
+        }
     }
 
     // Üye kendi rezervasyonunu,
@@ -332,18 +395,18 @@ public class RezervasyonlarController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // Rezervasyonu ödünç işlemine dönüştürür.
+    // Rezervasyonu barkodlu fiziksel kopyayla
+    // ödünç işlemine dönüştürür.
     [HttpPost]
     [ValidateAntiForgeryToken]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Tamamla(int id)
     {
-        var rezervasyon =
-            await _context.Rezervasyonlars
-                .Include(r => r.Kitap)
-                .Include(r => r.Uye)
-                .FirstOrDefaultAsync(r =>
-                    r.RezervasyonId == id);
+        var rezervasyon = await _context.Rezervasyonlars
+            .Include(r => r.Kitap)
+            .Include(r => r.Uye)
+            .FirstOrDefaultAsync(r =>
+                r.RezervasyonId == id);
 
         if (rezervasyon == null)
         {
@@ -369,10 +432,39 @@ public class RezervasyonlarController : Controller
             return RedirectToAction(nameof(Index));
         }
 
+        if (!rezervasyon.Kitap.AktifMi)
+        {
+            rezervasyon.Durum = "İptal";
+
+            await _context.SaveChangesAsync();
+
+            TempData["Hata"] =
+                "Kitap pasif olduğu için rezervasyon iptal edildi.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
         if (rezervasyon.Kitap.MevcutAdet <= 0)
         {
             TempData["Hata"] =
-                "Kitap henüz stokta bulunmuyor. Kitap iade edilmeden rezervasyon tamamlanamaz.";
+                "Kitap henüz stokta bulunmuyor. İade sonrasında tekrar deneyiniz.";
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        var raftakiKopya =
+            await _context.KitapKopyalaris
+                .Where(k =>
+                    k.KitapId ==
+                    rezervasyon.KitapId &&
+                    k.Durum == "Rafta")
+                .OrderBy(k => k.KopyaId)
+                .FirstOrDefaultAsync();
+
+        if (raftakiKopya == null)
+        {
+            TempData["Hata"] =
+                "Rafta barkodlu fiziksel kopya bulunamadı.";
 
             return RedirectToAction(nameof(Index));
         }
@@ -380,14 +472,16 @@ public class RezervasyonlarController : Controller
         bool kitapZatenUyede =
             await _context.OduncIslemleris
                 .AnyAsync(o =>
-                    o.UyeId == rezervasyon.UyeId &&
-                    o.KitapId == rezervasyon.KitapId &&
+                    o.UyeId ==
+                    rezervasyon.UyeId &&
+                    o.KitapId ==
+                    rezervasyon.KitapId &&
                     !o.TeslimEdildiMi);
 
         if (kitapZatenUyede)
         {
             TempData["Hata"] =
-                "Bu kitap zaten ilgili üyede ödünç olarak görünüyor.";
+                "Bu kitabın başka bir kopyası zaten ilgili üyede bulunuyor.";
 
             return RedirectToAction(nameof(Index));
         }
@@ -397,40 +491,54 @@ public class RezervasyonlarController : Controller
         var yeniOduncIslemi =
             new OduncIslemleri
             {
-                KitapId = rezervasyon.KitapId,
-                UyeId = rezervasyon.UyeId,
-                VerilisTarihi = verilisTarihi,
+                KitapId =
+                    rezervasyon.KitapId,
+
+                KopyaId =
+                    raftakiKopya.KopyaId,
+
+                UyeId =
+                    rezervasyon.UyeId,
+
+                VerilisTarihi =
+                    verilisTarihi,
+
                 SonTeslimTarihi =
                     verilisTarihi.AddDays(14),
+
                 IadeTarihi = null,
                 TeslimEdildiMi = false,
                 CezaTutari = 0
             };
 
-        _context.OduncIslemleris.Add(
-            yeniOduncIslemi);
+        raftakiKopya.Durum = "Ödünçte";
 
-        // Kitabın mevcut adedi bir azaltılır.
         rezervasyon.Kitap.MevcutAdet--;
 
-        // Rezervasyon tamamlandı yapılır.
         rezervasyon.Durum = "Tamamlandı";
+
+        _context.OduncIslemleris.Add(
+            yeniOduncIslemi);
 
         try
         {
             await _context.SaveChangesAsync();
 
-            TempData["Basarili"] =
-                "Rezervasyon tamamlandı ve kitap üyeye 14 gün süreyle ödünç verildi.";
+            TempData["BasariliMesaj"] =
+                $"Rezervasyon tamamlandı. {raftakiKopya.Barkod} barkodlu kopya üyeye 14 gün süreyle verildi.";
 
             return RedirectToAction(
-                "Index",
-                "OduncIslemleri");
+                "Details",
+                "OduncIslemleri",
+                new
+                {
+                    id = yeniOduncIslemi.OduncId
+                });
         }
         catch (DbUpdateException)
         {
             TempData["Hata"] =
-                "Rezervasyon ödünç işlemine dönüştürülürken bir hata oluştu.";
+                "Rezervasyon ödünç işlemine dönüştürülürken veritabanı hatası oluştu.";
 
             return RedirectToAction(nameof(Index));
         }
@@ -444,6 +552,7 @@ public class RezervasyonlarController : Controller
         var kitaplar =
             await _context.Kitaplars
                 .Where(k =>
+                    k.AktifMi &&
                     k.MevcutAdet <= 0)
                 .OrderBy(k =>
                     k.Baslik)

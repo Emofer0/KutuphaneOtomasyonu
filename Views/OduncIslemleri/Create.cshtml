@@ -1,62 +1,192 @@
 @model KutuphaneOtomasyonu.Models.OduncIslemleri
 
 @{
-    ViewData["Title"] = "Kitap Ödünç Ver";
+    ViewData["Title"] = "Yeni Ödünç İşlemi";
 }
 
-<h1>Kitap Ödünç Ver</h1>
+<div class="container py-4">
 
-<hr />
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
 
-<div class="row">
-    <div class="col-md-6">
-        <form asp-action="Create" method="post">
-            <div asp-validation-summary="ModelOnly"
-                 class="text-danger mb-3"></div>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="mb-1">
+                        Yeni Ödünç İşlemi
+                    </h1>
 
-            <div class="mb-3">
-                <label asp-for="KitapId" class="form-label">
-                    Kitap
-                </label>
+                    <p class="text-muted mb-0">
+                        Üyeyi seçin ve fiziksel kitap
+                        kopyasının barkodunu okutun.
+                    </p>
+                </div>
 
-                <select asp-for="KitapId"
-                        class="form-select"
-                        asp-items="ViewBag.KitapId">
-                    <option value="">Kitap seçiniz</option>
-                </select>
-
-                <span asp-validation-for="KitapId"
-                      class="text-danger"></span>
+                <a asp-action="Index"
+                   class="btn btn-outline-secondary">
+                    Listeye Dön
+                </a>
             </div>
 
-            <div class="mb-3">
-                <label asp-for="UyeId" class="form-label">
-                    Üye
-                </label>
+            <div class="card border-0 shadow">
 
-                <select asp-for="UyeId"
-                        class="form-select"
-                        asp-items="ViewBag.UyeId">
-                    <option value="">Üye seçiniz</option>
-                </select>
+                <div class="card-header text-white p-4"
+                     style="background-color:#102a4c;">
 
-                <span asp-validation-for="UyeId"
-                      class="text-danger"></span>
+                    <h2 class="h4 mb-1">
+                        Barkodla Kitap Ver
+                    </h2>
+
+                    <p class="mb-0 opacity-75">
+                        Yalnızca rafta bulunan aktif
+                        kopyalar ödünç verilebilir.
+                    </p>
+                </div>
+
+                <div class="card-body p-4">
+
+                    <div asp-validation-summary="ModelOnly"
+                         class="alert alert-danger">
+                    </div>
+
+                    <form asp-action="Create"
+                          method="post"
+                          id="oduncFormu">
+
+                        <div class="mb-4">
+                            <label for="UyeId"
+                                   class="form-label fw-semibold">
+                                Üye
+                            </label>
+
+                            <select asp-for="UyeId"
+                                    asp-items="ViewBag.UyeId"
+                                    class="form-select"
+                                    required>
+
+                                <option value="">
+                                    Üye seçiniz
+                                </option>
+                            </select>
+
+                            <span asp-validation-for="UyeId"
+                                  class="text-danger">
+                            </span>
+
+                            <div class="form-text">
+                                Yalnızca aktif üyeler listelenir.
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="Barkod"
+                                   class="form-label fw-semibold">
+                                Kitap Barkodu
+                            </label>
+
+                            <div class="input-group input-group-lg">
+
+                                <span class="input-group-text">
+                                    KTP
+                                </span>
+
+                                <input type="text"
+                                       id="Barkod"
+                                       name="Barkod"
+                                       value="@ViewBag.Barkod"
+                                       class="form-control"
+                                       placeholder="KTP-000001"
+                                       autocomplete="off"
+                                       autofocus
+                                       required />
+
+                                <button type="button"
+                                        id="barkoduTemizle"
+                                        class="btn btn-outline-secondary">
+                                    Temizle
+                                </button>
+                            </div>
+
+                            @if (ViewData.ModelState["Barkod"]?.Errors.Any() == true)
+                            {
+                                <div class="text-danger mt-1">
+                                    @foreach (var hata in
+                                        ViewData.ModelState["Barkod"]!.Errors)
+                                    {
+                                        <div>@hata.ErrorMessage</div>
+                                    }
+                                </div>
+                            }
+
+                            <div class="form-text">
+                                Barkod okuyucuyla okutabilir veya
+                                barkodu elle yazabilirsiniz.
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <strong>İşlem bilgisi:</strong>
+                            Kitap 14 gün süreyle üyeye verilir.
+                            İade sırasında aynı fiziksel kopya
+                            barkodu üzerinden tekrar rafa alınır.
+                        </div>
+
+                        <div class="d-flex justify-content-end gap-2">
+
+                            <a asp-action="Index"
+                               class="btn btn-outline-secondary">
+                                Vazgeç
+                            </a>
+
+                            <button type="submit"
+                                    class="btn btn-primary"
+                                    onclick="return confirm('Bu fiziksel kitap kopyası üyeye verilsin mi?')">
+                                Ödünç Ver
+                            </button>
+
+                        </div>
+                    </form>
+                </div>
             </div>
 
-            <button type="submit" class="btn btn-primary">
-                Ödünç Ver
-            </button>
-
-            <a asp-action="Index" class="btn btn-secondary">
-                Listeye Dön
-            </a>
-        </form>
+        </div>
     </div>
 </div>
 
 @section Scripts {
     @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+        await Html.RenderPartialAsync(
+            "_ValidationScriptsPartial");
     }
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const barkodAlani =
+                document.getElementById("Barkod");
+
+            const temizleButonu =
+                document.getElementById("barkoduTemizle");
+
+            if (barkodAlani) {
+                barkodAlani.focus();
+
+                barkodAlani.addEventListener(
+                    "input",
+                    function () {
+                        this.value =
+                            this.value.toUpperCase().trim();
+                    }
+                );
+            }
+
+            if (temizleButonu && barkodAlani) {
+                temizleButonu.addEventListener(
+                    "click",
+                    function () {
+                        barkodAlani.value = "";
+                        barkodAlani.focus();
+                    }
+                );
+            }
+        });
+    </script>
 }

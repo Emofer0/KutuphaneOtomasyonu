@@ -23,9 +23,12 @@ public partial class Kitaplar
 
     public bool AktifMi { get; set; }
 
-public string? PasifeAlmaNedeni { get; set; }
+    public string? PasifeAlmaNedeni { get; set; }
 
-public DateTime? PasifeAlmaTarihi { get; set; }
+    public DateTime? PasifeAlmaTarihi { get; set; }
+
+    public virtual ICollection<KitapKopyalari> KitapKopyalaris
+    { get; set; } = new List<KitapKopyalari>();
 
     public virtual Kategoriler Kategori { get; set; } = null!;
 

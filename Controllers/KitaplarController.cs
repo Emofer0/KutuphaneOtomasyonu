@@ -71,6 +71,7 @@ public class KitaplarController : Controller
             .Include(k => k.Yazar)
             .Include(k => k.OduncIslemleris)
                 .ThenInclude(o => o.Uye)
+            .Include(k => k.KitapKopyalaris)
             .FirstOrDefaultAsync(k =>
                 k.KitapId == id.Value);
 
@@ -79,7 +80,6 @@ public class KitaplarController : Controller
             return NotFound();
         }
 
-        // Üyeler pasif kitabın detayına giremez.
         if (User.IsInRole("Uye") &&
             !kitap.AktifMi)
         {
@@ -89,7 +89,7 @@ public class KitaplarController : Controller
         return View(kitap);
     }
 
-    // Stok yönetimi sayfası
+    // Stok ve barkod yönetimi
     [HttpGet]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> StokYonetimi(
@@ -103,6 +103,7 @@ public class KitaplarController : Controller
         var kitap = await _context.Kitaplars
             .Include(k => k.Yazar)
             .Include(k => k.Kategori)
+            .Include(k => k.KitapKopyalaris)
             .FirstOrDefaultAsync(k =>
                 k.KitapId == id.Value);
 
@@ -126,7 +127,7 @@ public class KitaplarController : Controller
         return View(kitap);
     }
 
-    // Yeni kitap sayfası
+    // Yeni kitap formu
     [HttpGet]
     [Authorize(Roles = "Admin")]
     public IActionResult Create()
@@ -136,7 +137,7 @@ public class KitaplarController : Controller
         return View();
     }
 
-    // Yeni kitap kaydetme
+    // Yeni kitap ve fiziksel kopyalarını oluşturur.
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
@@ -149,11 +150,20 @@ public class KitaplarController : Controller
         ModelState.Remove("Yazar");
         ModelState.Remove("Kategori");
         ModelState.Remove("OduncIslemleris");
+        ModelState.Remove("KitapKopyalaris");
         ModelState.Remove("AktifMi");
         ModelState.Remove("PasifeAlmaNedeni");
         ModelState.Remove("PasifeAlmaTarihi");
 
         KitapBilgileriniDogrula(kitap);
+
+        // Yeni eklenen kitabın bütün kopyaları rafta olmalıdır.
+        if (kitap.ToplamAdet != kitap.MevcutAdet)
+        {
+            ModelState.AddModelError(
+                "MevcutAdet",
+                "Yeni kitap eklenirken mevcut adet toplam adede eşit olmalıdır.");
+        }
 
         bool isbnKullaniliyor =
             await _context.Kitaplars.AnyAsync(k =>
@@ -201,17 +211,72 @@ public class KitaplarController : Controller
         kitap.PasifeAlmaNedeni = null;
         kitap.PasifeAlmaTarihi = null;
 
-        _context.Kitaplars.Add(kitap);
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            _context.Kitaplars.Add(kitap);
 
-        TempData["BasariliMesaj"] =
-            "Kitap başarıyla eklendi.";
+            // Önce KitapId oluşturulur.
+            await _context.SaveChangesAsync();
 
-        return RedirectToAction(nameof(Index));
+            var yeniKopyalar =
+                new List<KitapKopyalari>();
+
+            for (int i = 0;
+                 i < kitap.ToplamAdet;
+                 i++)
+            {
+                yeniKopyalar.Add(
+                    new KitapKopyalari
+                    {
+                        KitapId = kitap.KitapId,
+                        Barkod =
+                            "TMP-" +
+                            Guid.NewGuid().ToString("N"),
+                        Durum = "Rafta",
+                        EklenmeTarihi = DateTime.Now
+                    });
+            }
+
+            _context.KitapKopyalaris.AddRange(
+                yeniKopyalar);
+
+            // KopyaId değerleri oluşturulur.
+            await _context.SaveChangesAsync();
+
+            foreach (var kopya in yeniKopyalar)
+            {
+                kopya.Barkod =
+                    $"KTP-{kopya.KopyaId:D6}";
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            TempData["BasariliMesaj"] =
+                "Kitap ve barkodlu fiziksel kopyaları başarıyla oluşturuldu.";
+
+            return RedirectToAction(nameof(Index));
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync();
+
+            ModelState.AddModelError(
+                "",
+                "Kitap veya barkod kayıtları oluşturulurken veritabanı hatası oluştu.");
+
+            ListeleriHazirla(
+                kitap.KategoriId,
+                kitap.YazarId);
+
+            return View(kitap);
+        }
     }
 
-    // Kitap düzenleme sayfası
+    // Kitap düzenleme formu
     [HttpGet]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Edit(int? id)
@@ -236,7 +301,7 @@ public class KitaplarController : Controller
         return View(kitap);
     }
 
-    // Kitap bilgilerini güncelleme
+    // Yalnızca temel kitap bilgilerini günceller.
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
@@ -255,7 +320,7 @@ public class KitaplarController : Controller
         ModelState.Remove("Yazar");
         ModelState.Remove("Kategori");
         ModelState.Remove("OduncIslemleris");
-        ModelState.Remove("Sifre");
+        ModelState.Remove("KitapKopyalaris");
         ModelState.Remove("AktifMi");
         ModelState.Remove("ToplamAdet");
         ModelState.Remove("MevcutAdet");
@@ -265,7 +330,7 @@ public class KitaplarController : Controller
         bool isbnKullaniliyor =
             await _context.Kitaplars.AnyAsync(k =>
                 k.Isbn == formKitap.Isbn &&
-                k.KitapId != formKitap.KitapId);
+                k.KitapId != id);
 
         if (isbnKullaniliyor)
         {
@@ -353,7 +418,7 @@ public class KitaplarController : Controller
         return RedirectToAction(nameof(Index));
     }
 
-    // Kitabın tamamını pasife alma
+    // Kitabın tamamını pasife alır.
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
@@ -376,7 +441,7 @@ public class KitaplarController : Controller
         if (!kitap.AktifMi)
         {
             TempData["HataMesaji"] =
-                "Bu kitap zaten pasif durumda.";
+                "Kitap zaten pasif durumda.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
@@ -386,12 +451,8 @@ public class KitaplarController : Controller
         if (kitap.MevcutAdet !=
             kitap.ToplamAdet)
         {
-            int odunctekiAdet =
-                kitap.ToplamAdet -
-                kitap.MevcutAdet;
-
             TempData["HataMesaji"] =
-                $"Kitabın {odunctekiAdet} kopyası ödünçte olduğu için pasife alınamaz.";
+                "Ödünçte kopyası bulunan kitap pasife alınamaz.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
@@ -399,15 +460,14 @@ public class KitaplarController : Controller
         }
 
         bool aktifOduncVar =
-            await _context.OduncIslemleris
-                .AnyAsync(o =>
-                    o.KitapId == id &&
-                    !o.TeslimEdildiMi);
+            await _context.OduncIslemleris.AnyAsync(o =>
+                o.KitapId == id &&
+                !o.TeslimEdildiMi);
 
         if (aktifOduncVar)
         {
             TempData["HataMesaji"] =
-                "Teslim edilmemiş ödünç işlemi bulunduğu için kitap pasife alınamaz.";
+                "Teslim edilmemiş işlem bulunduğu için kitap pasife alınamaz.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
@@ -436,15 +496,14 @@ public class KitaplarController : Controller
         kitap.PasifeAlmaNedeni = neden;
         kitap.PasifeAlmaTarihi = DateTime.Now;
 
-        var bekleyenRezervasyonlar =
+        var rezervasyonlar =
             await _context.Rezervasyonlars
                 .Where(r =>
                     r.KitapId == id &&
                     r.Durum == "Bekliyor")
                 .ToListAsync();
 
-        foreach (var rezervasyon in
-                 bekleyenRezervasyonlar)
+        foreach (var rezervasyon in rezervasyonlar)
         {
             rezervasyon.Durum = "İptal";
         }
@@ -452,8 +511,8 @@ public class KitaplarController : Controller
         await _context.SaveChangesAsync();
 
         TempData["BasariliMesaj"] =
-            bekleyenRezervasyonlar.Any()
-                ? $"Kitap pasife alındı ve {bekleyenRezervasyonlar.Count} rezervasyon iptal edildi."
+            rezervasyonlar.Any()
+                ? $"Kitap pasife alındı ve {rezervasyonlar.Count} rezervasyon iptal edildi."
                 : "Kitap başarıyla pasife alındı.";
 
         return RedirectToAction(
@@ -461,7 +520,7 @@ public class KitaplarController : Controller
             new { id });
     }
 
-    // Pasif kitabı yeniden aktifleştirme
+    // Pasif kitabı yeniden aktifleştirir.
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
@@ -482,16 +541,21 @@ public class KitaplarController : Controller
         if (kitap.AktifMi)
         {
             TempData["HataMesaji"] =
-                "Bu kitap zaten aktif durumda.";
+                "Kitap zaten aktif durumda.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
                 new { id });
         }
 
+        int raftakiKopyaSayisi =
+            await _context.KitapKopyalaris
+                .CountAsync(k =>
+                    k.KitapId == id &&
+                    k.Durum == "Rafta");
+
         kitap.AktifMi = true;
-        kitap.MevcutAdet =
-            kitap.ToplamAdet;
+        kitap.MevcutAdet = raftakiKopyaSayisi;
         kitap.PasifeAlmaNedeni = null;
         kitap.PasifeAlmaTarihi = null;
 
@@ -505,7 +569,7 @@ public class KitaplarController : Controller
             new { id });
     }
 
-    // Yeni fiziksel kopya ekleme
+    // Yeni fiziksel kopyalar ekleyip barkod oluşturur.
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
@@ -528,37 +592,79 @@ public class KitaplarController : Controller
         if (!kitap.AktifMi)
         {
             TempData["HataMesaji"] =
-                "Pasif kitaba kopya eklenemez. Önce kitabı aktif etmelisiniz.";
+                "Önce kitabı aktif etmelisiniz.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
                 new { id });
         }
 
-        if (adet <= 0)
+        if (adet <= 0 || adet > 100)
         {
             TempData["HataMesaji"] =
-                "Artırılacak kopya sayısı sıfırdan büyük olmalıdır.";
+                "Tek işlemde 1 ile 100 arasında kopya ekleyebilirsiniz.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
                 new { id });
         }
 
-        kitap.ToplamAdet += adet;
-        kitap.MevcutAdet += adet;
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync();
 
-        await _context.SaveChangesAsync();
+        try
+        {
+            var yeniKopyalar =
+                new List<KitapKopyalari>();
 
-        TempData["BasariliMesaj"] =
-            $"{kitap.Baslik} kitabına {adet} yeni kopya eklendi.";
+            for (int i = 0; i < adet; i++)
+            {
+                yeniKopyalar.Add(
+                    new KitapKopyalari
+                    {
+                        KitapId = id,
+                        Barkod =
+                            "TMP-" +
+                            Guid.NewGuid().ToString("N"),
+                        Durum = "Rafta",
+                        EklenmeTarihi = DateTime.Now
+                    });
+            }
+
+            _context.KitapKopyalaris.AddRange(
+                yeniKopyalar);
+
+            kitap.ToplamAdet += adet;
+            kitap.MevcutAdet += adet;
+
+            await _context.SaveChangesAsync();
+
+            foreach (var kopya in yeniKopyalar)
+            {
+                kopya.Barkod =
+                    $"KTP-{kopya.KopyaId:D6}";
+            }
+
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            TempData["BasariliMesaj"] =
+                $"{adet} yeni kopya ve barkodu oluşturuldu.";
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync();
+
+            TempData["HataMesaji"] =
+                "Kopyalar kaydedilirken veritabanı hatası oluştu.";
+        }
 
         return RedirectToAction(
             nameof(StokYonetimi),
             new { id });
     }
 
-    // Raftaki fiziksel kopyaları azaltma
+    // Raftaki belirli kopyaları stoktan çıkarır.
     [HttpPost]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
@@ -582,33 +688,18 @@ public class KitaplarController : Controller
         if (!kitap.AktifMi)
         {
             TempData["HataMesaji"] =
-                "Pasif kitabın kopya sayısı değiştirilemez.";
+                "Pasif kitabın kopyaları azaltılamaz.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
                 new { id });
         }
 
-        if (adet <= 0)
+        if (adet <= 0 ||
+            adet > kitap.MevcutAdet)
         {
             TempData["HataMesaji"] =
-                "Azaltılacak kopya sayısı sıfırdan büyük olmalıdır.";
-
-            return RedirectToAction(
-                nameof(StokYonetimi),
-                new { id });
-        }
-
-        // Yalnızca raftaki kopyalar azaltılabilir.
-        if (adet > kitap.MevcutAdet)
-        {
-            int odunctekiAdet =
-                kitap.ToplamAdet -
-                kitap.MevcutAdet;
-
-            TempData["HataMesaji"] =
-                $"Rafta yalnızca {kitap.MevcutAdet} kopya bulunuyor. " +
-                $"{odunctekiAdet} kopya ödünçte.";
+                $"Rafta en fazla {kitap.MevcutAdet} kopya azaltılabilir.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
@@ -626,35 +717,63 @@ public class KitaplarController : Controller
             !gecerliNedenler.Contains(neden))
         {
             TempData["HataMesaji"] =
-                "Geçerli bir kopya azaltma nedeni seçiniz.";
+                "Geçerli bir azaltma nedeni seçiniz.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
                 new { id });
         }
 
+        var raftakiKopyalar =
+            await _context.KitapKopyalaris
+                .Where(k =>
+                    k.KitapId == id &&
+                    k.Durum == "Rafta")
+                .OrderBy(k => k.KopyaId)
+                .Take(adet)
+                .ToListAsync();
+
+        if (raftakiKopyalar.Count < adet)
+        {
+            TempData["HataMesaji"] =
+                "Yeterli sayıda rafta barkodlu kopya bulunamadı.";
+
+            return RedirectToAction(
+                nameof(StokYonetimi),
+                new { id });
+        }
+
+        string yeniDurum = neden switch
+        {
+            "Kayıp" => "Kayıp",
+            "Hasarlı" => "Hasarlı",
+            _ => "Pasif"
+        };
+
+        foreach (var kopya in raftakiKopyalar)
+        {
+            kopya.Durum = yeniDurum;
+        }
+
         kitap.ToplamAdet -= adet;
         kitap.MevcutAdet -= adet;
 
-        // Son kopya da çıkarılırsa kitap pasif olur.
         if (kitap.ToplamAdet == 0)
         {
             kitap.AktifMi = false;
             kitap.MevcutAdet = 0;
             kitap.PasifeAlmaNedeni =
                 $"Tüm kopyalar stoktan çıkarıldı: {neden}";
-            kitap.PasifeAlmaTarihi =
-                DateTime.Now;
+            kitap.PasifeAlmaTarihi = DateTime.Now;
 
-            var bekleyenRezervasyonlar =
+            var rezervasyonlar =
                 await _context.Rezervasyonlars
                     .Where(r =>
                         r.KitapId == id &&
                         r.Durum == "Bekliyor")
                     .ToListAsync();
 
-            foreach (var rezervasyon in
-                     bekleyenRezervasyonlar)
+            foreach (var rezervasyon in rezervasyonlar)
             {
                 rezervasyon.Durum = "İptal";
             }
@@ -664,7 +783,7 @@ public class KitaplarController : Controller
 
         TempData["BasariliMesaj"] =
             kitap.ToplamAdet == 0
-                ? $"{adet} kopya '{neden}' nedeniyle çıkarıldı. Son kopya da kaldırıldığı için kitap pasife alındı."
+                ? "Son kopya da çıkarıldığı için kitap pasife alındı."
                 : $"{adet} kopya '{neden}' nedeniyle stoktan çıkarıldı.";
 
         return RedirectToAction(
@@ -686,6 +805,7 @@ public class KitaplarController : Controller
             .Include(k => k.Kategori)
             .Include(k => k.Yazar)
             .Include(k => k.OduncIslemleris)
+            .Include(k => k.KitapKopyalaris)
             .FirstOrDefaultAsync(k =>
                 k.KitapId == id.Value);
 
@@ -703,7 +823,7 @@ public class KitaplarController : Controller
             rezervasyonGecmisiVar)
         {
             TempData["HataMesaji"] =
-                "İşlem geçmişi bulunan kitap tamamen silinemez. Kitabı pasife alabilirsiniz.";
+                "İşlem geçmişi bulunan kitap tamamen silinemez.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
@@ -714,7 +834,7 @@ public class KitaplarController : Controller
             kitap.ToplamAdet)
         {
             TempData["HataMesaji"] =
-                "Bütün kopyalar mevcut olmadan kitap silinemez.";
+                "Bütün kopyalar rafta olmadan kitap silinemez.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
@@ -724,7 +844,7 @@ public class KitaplarController : Controller
         return View(kitap);
     }
 
-    // Kitabı tamamen silme
+    // Kitabı ve barkodlu kopyalarını tamamen siler.
     [HttpPost, ActionName("Delete")]
     [Authorize(Roles = "Admin")]
     [ValidateAntiForgeryToken]
@@ -733,6 +853,7 @@ public class KitaplarController : Controller
     {
         var kitap = await _context.Kitaplars
             .Include(k => k.OduncIslemleris)
+            .Include(k => k.KitapKopyalaris)
             .FirstOrDefaultAsync(k =>
                 k.KitapId == id);
 
@@ -764,32 +885,34 @@ public class KitaplarController : Controller
             kitap.ToplamAdet)
         {
             TempData["HataMesaji"] =
-                "Bütün kopyalar mevcut olmadan kitap silinemez.";
+                "Bütün kopyalar rafta olmadan kitap silinemez.";
 
             return RedirectToAction(
                 nameof(StokYonetimi),
                 new { id });
         }
 
+        _context.KitapKopyalaris.RemoveRange(
+            kitap.KitapKopyalaris);
+
         _context.Kitaplars.Remove(kitap);
 
         await _context.SaveChangesAsync();
 
         TempData["BasariliMesaj"] =
-            "İşlem geçmişi olmayan kitap tamamen silindi.";
+            "Kitap ve barkodlu kopyaları tamamen silindi.";
 
         return RedirectToAction(nameof(Index));
     }
 
-    // Kitap adetlerini doğrular
     private void KitapBilgileriniDogrula(
         Kitaplar kitap)
     {
-        if (kitap.ToplamAdet < 0)
+        if (kitap.ToplamAdet <= 0)
         {
             ModelState.AddModelError(
                 "ToplamAdet",
-                "Toplam adet sıfırdan küçük olamaz.");
+                "Toplam adet en az 1 olmalıdır.");
         }
 
         if (kitap.MevcutAdet < 0)
@@ -808,7 +931,6 @@ public class KitaplarController : Controller
         }
     }
 
-    // Kategori ve yazar listelerini hazırlar
     private void ListeleriHazirla(
         int? kategoriId = null,
         int? yazarId = null)

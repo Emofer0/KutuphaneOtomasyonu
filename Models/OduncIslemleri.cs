@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-
-namespace KutuphaneOtomasyonu.Models;
+﻿namespace KutuphaneOtomasyonu.Models;
 
 public partial class OduncIslemleri
 {
@@ -10,6 +7,8 @@ public partial class OduncIslemleri
     public int KitapId { get; set; }
 
     public int UyeId { get; set; }
+
+    public int? KopyaId { get; set; }
 
     public DateTime VerilisTarihi { get; set; }
 
@@ -21,7 +20,12 @@ public partial class OduncIslemleri
 
     public bool TeslimEdildiMi { get; set; }
 
-    public virtual Kitaplar Kitap { get; set; } = null!;
+    public virtual Kitaplar Kitap
+        { get; set; } = null!;
 
-    public virtual Uyeler Uye { get; set; } = null!;
+    public virtual Uyeler Uye
+        { get; set; } = null!;
+
+    public virtual KitapKopyalari? Kopya
+        { get; set; }
 }
